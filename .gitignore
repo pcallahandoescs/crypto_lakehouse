@@ -1,0 +1,56 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ---- uv / virtualenv ----
+.venv/
+venv/
+# uv.lock IS committed on purpose (reproducible installs) - do not ignore it.
+
+# ---- Tooling caches ----
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ---- Private / local-only (planning notes, scratch) ----
+_local/
+
+# ---- Secrets / local env ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ---- Data / lakehouse artifacts (never commit data) ----
+data/
+*.parquet
+*.avro
+# Delta/Spark local scratch
+spark-warehouse/
+metastore_db/
+derby.log
+# MinIO local volume
+minio-data/
+
+# ---- Airflow local state ----
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

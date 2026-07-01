@@ -1,0 +1,74 @@
+[project]
+name = "crypto-lakehouse"
+version = "0.1.0"
+description = "Real-time crypto market data lakehouse: Coinbase WS -> Kafka -> Spark -> Delta on MinIO -> FastAPI, built as a Lambda architecture."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "MIT" }
+authors = [{ name = "Patrick Callahan", email = "patrickcallah@gmail.com" }]
+
+# Runtime dependencies are intentionally empty on Day 1.
+# Each service (producer, spark_jobs, serving, dashboard) adds its own deps as it is built,
+# so we never ship libraries a service doesn't actually use.
+dependencies = []
+
+# PEP 735 dependency group for local development tooling.
+# Installed with `uv sync` but never shipped in service images.
+[dependency-groups]
+dev = [
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pytest>=8",
+    "pytest-cov>=5",
+    "pre-commit>=3.7",
+]
+
+[tool.uv]
+# This repo is a collection of services, not an installable library,
+# so uv should not try to build/install the root project itself.
+package = false
+# Always use a uv-managed (downloaded) Python interpreter, never a system one.
+# This guarantees a native, architecture-consistent toolchain for everyone who
+# builds the project and avoids Intel/arm64 mismatches on Apple Silicon.
+python-preference = "only-managed"
+
+# ------------------------------------------------------------------
+# Ruff: linter + formatter (replaces black, isort, flake8, and more)
+# ------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# A pragmatic-but-strict rule set. Each code is a family of checks:
+#   E/W  pycodestyle, F pyflakes, I import sorting, UP pyupgrade,
+#   B bugbear, SIM simplifications, C4 comprehensions, PTH prefer pathlib,
+#   RUF ruff-specific.
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "PTH", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# ------------------------------------------------------------------
+# mypy: static type checking (strict from day one)
+# ------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+# Only list directories that currently contain code; expand this list as
+# each service (spark_jobs, serving, dashboard) gains real modules.
+files = ["producer", "tests"]
+
+# ------------------------------------------------------------------
+# pytest
+# ------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+# Put the repo root on sys.path so tests can `import producer` etc. without
+# installing the project as a package (we run services from source, uv package=false).
+pythonpath = ["."]

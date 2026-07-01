@@ -1,0 +1,33 @@
+# Pre-commit runs fast checks before each commit so bad code never lands.
+# Install once with: make hooks   (or: uv run pre-commit install)
+# Revisions below are refreshed via `uv run pre-commit autoupdate`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Run mypy from the project's own uv environment rather than a pre-commit
+  # sandbox. This avoids arch/dependency mismatches and type-checks against the
+  # exact versions the project uses.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        # Type-check the whole project via pyproject `files`, not just changed
+        # files, so cross-module imports resolve correctly.
+        pass_filenames: false
+        types_or: [python, pyi]
