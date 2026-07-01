@@ -5,7 +5,7 @@
 > medallion architecture on MinIO, orchestrated with Airflow, served via FastAPI +
 > a live dashboard, and deployed on Kubernetes.
 
-**Status:** 🚧 Building in public — **Week 1, Day 1 (scaffolding)**. The build
+**Status:** Building in public — **Week 1, Day 1 (scaffolding)**. The build
 progresses in weekly milestones (see the [Roadmap](#roadmap) below).
 
 ---
