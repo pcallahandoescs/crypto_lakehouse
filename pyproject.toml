@@ -10,7 +10,9 @@ authors = [{ name = "Patrick Callahan", email = "patrickcallah@gmail.com" }]
 # Runtime dependencies are intentionally empty on Day 1.
 # Each service (producer, spark_jobs, serving, dashboard) adds its own deps as it is built,
 # so we never ship libraries a service doesn't actually use.
-dependencies = []
+dependencies = [
+    "websockets>=16.0",
+]
 
 # PEP 735 dependency group for local development tooling.
 # Installed with `uv sync` but never shipped in service images.
