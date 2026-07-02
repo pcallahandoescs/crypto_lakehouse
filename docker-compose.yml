@@ -1,0 +1,61 @@
+# Local ingestion stack. Day 3: a single-broker Apache Kafka in KRaft mode.
+# More services (MinIO, Spark, Airflow, ...) are added in later weeks.
+#
+# KRaft = Kafka's built-in Raft-based metadata layer. It replaces ZooKeeper, so
+# this one container is the entire Kafka control + data plane (no separate ZK).
+# In Kafka 4.x ZooKeeper is removed entirely; KRaft is the only mode.
+
+services:
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    ports:
+      # Only the HOST listener is published to your machine. Clients on the host
+      # (console tools, the Day 4 producer) connect via localhost:9092.
+      - "9092:9092"
+    environment:
+      # --- KRaft: this single node is BOTH broker and controller ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # --- Listeners ---
+      # Three listeners:
+      #   HOST       -> for clients on your laptop (advertised as localhost:9092)
+      #   DOCKER     -> for other containers on the compose network (kafka:29092)
+      #   CONTROLLER -> internal KRaft consensus traffic
+      # The dual HOST/DOCKER split is the classic "advertised listeners" fix so
+      # both host tools AND in-network services (Spark, Week 2) can reach Kafka.
+      KAFKA_LISTENERS: HOST://0.0.0.0:9092,DOCKER://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,DOCKER://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+
+      # --- Single-node settings (no replication possible with one broker) ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # Force explicit topic creation (no accidental auto-created topics).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_PARTITIONS: 6
+
+      # Persist the log to the mounted volume (survives restarts).
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  kafka-data:
