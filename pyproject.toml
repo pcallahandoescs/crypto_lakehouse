@@ -11,6 +11,7 @@ authors = [{ name = "Patrick Callahan", email = "patrickcallah@gmail.com" }]
 # Each service (producer, spark_jobs, serving, dashboard) adds its own deps as it is built,
 # so we never ship libraries a service doesn't actually use.
 dependencies = [
+    "confluent-kafka>=2.15.0",
     "websockets>=16.0",
 ]
 
@@ -64,6 +65,11 @@ show_error_codes = true
 # Only list directories that currently contain code; expand this list as
 # each service (spark_jobs, serving, dashboard) gains real modules.
 files = ["producer", "tests"]
+
+# confluent-kafka ships no type stubs; treat it as untyped instead of erroring.
+[[tool.mypy.overrides]]
+module = ["confluent_kafka.*"]
+ignore_missing_imports = true
 
 # ------------------------------------------------------------------
 # pytest
