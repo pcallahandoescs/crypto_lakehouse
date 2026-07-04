@@ -57,5 +57,25 @@ services:
       retries: 12
       start_period: 20s
 
+  # Our custom producer image (built from producer/Dockerfile). Streams live
+  # Coinbase trades into Kafka. `build:` (not `image:`) makes this our own image.
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    container_name: producer
+    depends_on:
+      # Wait until Kafka's healthcheck passes before starting — otherwise the
+      # producer would race the broker and fail its first connection.
+      kafka:
+        condition: service_healthy
+    environment:
+      # Talk to Kafka over the in-network DOCKER listener, not localhost.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: crypto.trades.raw
+      PRODUCTS: "BTC-USD,ETH-USD"
+    # Recover from transient WebSocket/broker hiccups automatically.
+    restart: unless-stopped
+
 volumes:
   kafka-data:

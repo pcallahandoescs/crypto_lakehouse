@@ -1,0 +1,30 @@
+# Keep the Docker build context small and reproducible. Only pyproject.toml,
+# uv.lock, and producer/ are actually copied into the image.
+
+# Virtualenvs / caches
+.venv/
+**/__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# VCS + private/local files
+.git/
+.gitignore
+_local/
+
+# Everything not needed to build the producer image
+docs/
+tests/
+scripts/
+airflow/
+spark_jobs/
+serving/
+dashboard/
+k8s/
+*.md
+Makefile
+.pre-commit-config.yaml
+docker-compose.yml
+.python-version
