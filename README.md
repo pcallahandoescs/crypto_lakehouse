@@ -5,8 +5,13 @@
 > medallion architecture on MinIO, orchestrated with Airflow, served via FastAPI +
 > a live dashboard, and deployed on Kubernetes.
 
-**Status:** Building in public — **Week 1, Day 1 (scaffolding)**. The build
-progresses in weekly milestones (see the [Roadmap](#roadmap) below).
+**Status:** Building in public — **Week 1, Day 7 (Week 1 review & docs)**. Live
+trades flow into Kafka, containerized and verified against a formal data
+contract. The build progresses in weekly milestones (see the
+[Roadmap](#roadmap) below).
+
+Full design and the reasoning behind every choice:
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) · decisions log [`docs/adr/`](./docs/adr/).
 
 ---
 
@@ -43,7 +48,8 @@ flowchart TD
 ```
 
 > This diagram is the target design; components come online across Weeks 1–4.
-> A polished diagram will replace this Mermaid sketch by Day 7 (`ARCHITECTURE.md`).
+> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the Lambda
+> rationale, and current build status.
 
 ## Tech stack
 
@@ -60,7 +66,8 @@ flowchart TD
 | Containers | Docker + Compose | Reproducible local stack |
 | Deployment | Kubernetes (kind) | Container orchestration: scaling, self-healing |
 
-Alternatives considered for each choice are documented in the decisions log (Day 7).
+Alternatives considered for each choice are documented in the
+[decisions log](./docs/adr/).
 
 ## Repository layout
 
@@ -71,7 +78,8 @@ airflow/      # DAGs orchestrating the batch layer + backfills
 serving/      # FastAPI service querying the gold Delta tables
 dashboard/    # Live candlestick dashboard
 k8s/          # Kubernetes manifests / Helm chart
-docs/         # Architecture, decisions log, data schema
+docs/         # Data schema, Kafka setup, data contract
+docs/adr/     # Architecture Decision Records (the decisions log)
 tests/        # Unit tests (transformations, DQ logic)
 ```
 
