@@ -13,6 +13,8 @@ authors = [{ name = "Patrick Callahan", email = "patrickcallah@gmail.com" }]
 dependencies = [
     "confluent-kafka>=2.15.0",
     "websockets>=16.0",
+    # Data contract / schema validation at the ingestion boundary (Day 6).
+    "pydantic>=2.7",
 ]
 
 # PEP 735 dependency group for local development tooling.
@@ -62,9 +64,12 @@ strict = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 show_error_codes = true
+# Pydantic's mypy plugin teaches mypy about model fields, validators, and the
+# generated __init__ so the data contract is fully type-checked.
+plugins = ["pydantic.mypy"]
 # Only list directories that currently contain code; expand this list as
 # each service (spark_jobs, serving, dashboard) gains real modules.
-files = ["producer", "tests"]
+files = ["producer", "consumer", "tests"]
 
 # confluent-kafka ships no type stubs; treat it as untyped instead of erroring.
 [[tool.mypy.overrides]]
