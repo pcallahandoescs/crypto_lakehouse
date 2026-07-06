@@ -23,6 +23,9 @@ coverage.xml
 
 # ---- Private / local-only (planning notes, scratch) ----
 _local/
+# Personal learning + interview-prep decisions log (the ADRs in docs/adr/ are the
+# public record; this one stays private).
+design_decisions.md
 
 # ---- Secrets / local env ----
 .env
