@@ -30,6 +30,7 @@ reasoning durable. See [ADR 0001](./0001-record-architecture-decisions.md).
 | [0008](./0008-data-contract-pydantic.md) | Data contract: Pydantic at the boundary | Accepted |
 | [0009](./0009-partitioning-strategy.md) | Gold-table partitioning strategy | Proposed (Day 14) |
 | [0010](./0010-zorder-vs-liquid-clustering.md) | Z-ordering vs. liquid clustering | Proposed (Day 14) |
+| [0011](./0011-minio-image-chainguard.md) | MinIO container image: Chainguard | Accepted |
 
 ## Template
 

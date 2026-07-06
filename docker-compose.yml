@@ -77,5 +77,51 @@ services:
     # Recover from transient WebSocket/broker hiccups automatically.
     restart: unless-stopped
 
+  # ----------------------------------------------------------------------------
+  # MinIO (Day 8): S3-compatible object storage — the lakehouse storage layer.
+  # Delta tables (bronze/silver/gold) will live here, reached by Spark via the
+  # S3A connector exactly as they would against real S3 — so the design is
+  # cloud-portable (swap MinIO for S3/GCS/ADLS with a config change).
+  #
+  # Image: MinIO stopped publishing to Docker Hub/Quay (Oct 2025); the leftover
+  # images are unmaintained (CVE-2025-62506). We use Chainguard's maintained,
+  # secure-by-default image instead. See docs/adr/0011-minio-image-chainguard.md.
+  # ----------------------------------------------------------------------------
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000" # S3 API (Spark, mc, SDKs connect here)
+      - "9001:9001" # web console — browse at http://localhost:9001
+    environment:
+      # Local-dev credentials only. In production these are secrets, not literals.
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    # No container healthcheck on purpose: Chainguard's minimal image has no shell
+    # or curl to probe the /minio/health/live endpoint from inside. Readiness is
+    # handled by clients instead — createbuckets retries via restart:on-failure,
+    # and Spark's S3A client retries its connections. (A team wanting a real
+    # healthcheck could use the "-dev" image variant, which bundles a shell.)
+    restart: unless-stopped
+
+  # One-shot init container: create the medallion buckets, then exit.
+  # The Chainguard mc image is minimal (no shell), so instead of a `sh` wait-loop
+  # we point mc at MinIO via MC_HOST_* and let Docker's restart:on-failure retry
+  # until MinIO accepts connections. `--ignore-existing` makes it idempotent, so
+  # it's safe to re-run on every `up` (or `docker compose run --rm createbuckets`).
+  createbuckets:
+    image: cgr.dev/chainguard/minio-client:latest
+    container_name: createbuckets
+    depends_on:
+      - minio
+    environment:
+      MC_HOST_local: "http://minioadmin:minioadmin@minio:9000"
+    command: ["mb", "--ignore-existing", "local/bronze", "local/silver", "local/gold"]
+    restart: on-failure
+
 volumes:
   kafka-data:
+  minio-data:
