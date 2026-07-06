@@ -122,6 +122,33 @@ services:
     command: ["mb", "--ignore-existing", "local/bronze", "local/silver", "local/gold"]
     restart: on-failure
 
+  # ----------------------------------------------------------------------------
+  # Spark job-runner (Day 9): Spark 3.5.3 + Delta + S3A, for reading/writing the
+  # Delta lakehouse on MinIO. This is a *job runner*, not a long-lived service —
+  # it runs a job and exits, so it's behind the "jobs" profile (a plain
+  # `docker compose up` won't start it). Run a job with:
+  #   docker compose run --rm spark                          # the smoke test
+  #   docker compose run --rm spark /opt/spark/bin/spark-submit --master local[*] <job.py>
+  # Local mode (local[*]) is enough here; a standalone master/worker is the
+  # scale-up. spark_jobs/ is mounted so jobs can be edited without rebuilding.
+  # ----------------------------------------------------------------------------
+  spark:
+    build:
+      context: .
+      dockerfile: spark_jobs/Dockerfile
+    image: crypto-lakehouse-spark:3.5.3
+    profiles: ["jobs"]
+    depends_on:
+      - minio
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ./spark_jobs:/opt/spark/work-dir
+    working_dir: /opt/spark/work-dir
+    command: ["/opt/spark/bin/spark-submit", "--master", "local[*]", "test_delta.py"]
+
 volumes:
   kafka-data:
   minio-data:
