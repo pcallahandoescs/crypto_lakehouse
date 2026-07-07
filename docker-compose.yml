@@ -140,10 +140,14 @@ services:
     profiles: ["jobs"]
     depends_on:
       - minio
+      - kafka
     environment:
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
+      # Bronze stream reads Kafka over the in-network DOCKER listener.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: crypto.trades.raw
     volumes:
       - ./spark_jobs:/opt/spark/work-dir
     working_dir: /opt/spark/work-dir
