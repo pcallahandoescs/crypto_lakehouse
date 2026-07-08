@@ -68,11 +68,15 @@ def main() -> None:
     )
 
     # Print per-batch progress so the ingestion is visible; Ctrl+C to stop.
+    # Only print when the batch id changes (during a backlog many batches run
+    # between 10s samples; repeated idle ticks are noise).
+    last_batch = -1
     try:
         while query.isActive:
             query.awaitTermination(10)
             progress = query.lastProgress
-            if progress is not None:
+            if progress is not None and progress["batchId"] != last_batch:
+                last_batch = progress["batchId"]
                 print(
                     f"[progress] batch={progress['batchId']} "
                     f"inputRows={progress['numInputRows']} "

@@ -19,6 +19,11 @@ def build_spark(app_name: str) -> SparkSession:
     secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
     return (
         SparkSession.builder.appName(app_name)
+        # Single-node right-sizing: the default 200 shuffle partitions is a
+        # cluster default. On one laptop JVM it's pure overhead -- and for a
+        # *stateful* streaming query it means 200 state-store instances, which
+        # OOMs a small driver. 8 is plenty for local dev.
+        .config("spark.sql.shuffle.partitions", "8")
         # Delta SQL support (format("delta"), time travel, MERGE, ...).
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config(
