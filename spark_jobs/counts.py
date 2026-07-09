@@ -18,6 +18,7 @@ from pyspark.sql.functions import countDistinct
 
 BRONZE_PATH = "s3a://bronze/trades"
 SILVER_PATH = "s3a://silver/trades"
+GOLD_PATH = "s3a://gold/ohlc"
 
 
 def _count(spark: SparkSession, path: str) -> int:
@@ -47,6 +48,18 @@ def main() -> None:
         )
         print(f"silver distinct keys     : {distinct}")
         print(f"silver dedup clean?      : {distinct == silver}")
+
+    gold = _count(spark, GOLD_PATH)
+    print(f"gold candles             : {gold}")
+    if gold > 0:
+        distinct_candles = (
+            spark.read.format("delta")
+            .load(GOLD_PATH)
+            .select(countDistinct("product_id", "interval_start"))
+            .collect()[0][0]
+        )
+        print(f"gold distinct grain      : {distinct_candles}")
+        print(f"gold grain clean?        : {distinct_candles == gold}")
 
     spark.stop()
 
