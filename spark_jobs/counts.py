@@ -19,6 +19,7 @@ from pyspark.sql.functions import countDistinct
 BRONZE_PATH = "s3a://bronze/trades"
 SILVER_PATH = "s3a://silver/trades"
 GOLD_PATH = "s3a://gold/ohlc"
+REALTIME_PATH = "s3a://gold/realtime_metrics"
 
 
 def _count(spark: SparkSession, path: str) -> int:
@@ -60,6 +61,9 @@ def main() -> None:
         )
         print(f"gold distinct grain      : {distinct_candles}")
         print(f"gold grain clean?        : {distinct_candles == gold}")
+
+    realtime = _count(spark, REALTIME_PATH)
+    print(f"gold_realtime rows       : {realtime}")
 
     spark.stop()
 

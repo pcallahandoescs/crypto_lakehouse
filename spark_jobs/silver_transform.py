@@ -20,41 +20,13 @@ Run (let it stream, then Ctrl+C):
 
 from __future__ import annotations
 
-from common import build_spark
+from common import TRADE_SCHEMA, build_spark
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, current_timestamp, from_json
-from pyspark.sql.types import (
-    DecimalType,
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
 
 BRONZE_PATH = "s3a://bronze/trades"
 SILVER_PATH = "s3a://silver/trades"
 CHECKPOINT_PATH = "s3a://silver/_checkpoints/trades"
-
-# Spark-side mirror of the Pydantic `Trade` contract (consumer/schema.py).
-# from_json casts JSON string values into these types; anything it can't parse
-# (bad JSON, missing/typed-wrong fields) becomes null and gets filtered out.
-#   - price/size: DECIMAL, never DOUBLE -- exact money, no float drift.
-#   - time: real TIMESTAMP (event time), parsed from the ISO-8601 string.
-TRADE_SCHEMA = StructType(
-    [
-        StructField("type", StringType()),
-        StructField("trade_id", LongType()),
-        StructField("maker_order_id", StringType()),
-        StructField("taker_order_id", StringType()),
-        StructField("side", StringType()),
-        StructField("size", DecimalType(38, 18)),
-        StructField("price", DecimalType(38, 18)),
-        StructField("product_id", StringType()),
-        StructField("sequence", LongType()),
-        StructField("time", TimestampType()),
-    ]
-)
 
 
 def to_silver(bronze: DataFrame) -> DataFrame:

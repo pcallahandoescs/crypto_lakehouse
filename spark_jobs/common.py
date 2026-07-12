@@ -10,6 +10,35 @@ from __future__ import annotations
 import os
 
 from pyspark.sql import SparkSession
+from pyspark.sql.types import (
+    DecimalType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
+
+# Spark-side mirror of the Pydantic `Trade` contract (consumer/schema.py). Used
+# by every job that parses the raw Coinbase JSON: silver (from bronze) and the
+# speed layer (from Kafka). from_json casts JSON values into these types; bad or
+# missing values become null and get filtered downstream.
+#   - price/size: DECIMAL, never DOUBLE -- exact money, no float drift.
+#   - time: real TIMESTAMP (event time), parsed from the ISO-8601 string.
+TRADE_SCHEMA = StructType(
+    [
+        StructField("type", StringType()),
+        StructField("trade_id", LongType()),
+        StructField("maker_order_id", StringType()),
+        StructField("taker_order_id", StringType()),
+        StructField("side", StringType()),
+        StructField("size", DecimalType(38, 18)),
+        StructField("price", DecimalType(38, 18)),
+        StructField("product_id", StringType()),
+        StructField("sequence", LongType()),
+        StructField("time", TimestampType()),
+    ]
+)
 
 
 def build_spark(app_name: str) -> SparkSession:
