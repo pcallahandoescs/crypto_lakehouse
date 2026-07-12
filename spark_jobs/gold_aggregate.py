@@ -81,9 +81,20 @@ def main() -> None:
     print(f"gold aggregate: {SILVER_PATH} -> {GOLD_PATH} (interval={INTERVAL})")
 
     silver = spark.read.format("delta").load(SILVER_PATH)
-    gold = to_gold(silver, INTERVAL)
+    # Partition by event date: typical queries filter a date/time range, so
+    # date-partitioning lets Delta prune whole directories. Deliberately NOT by
+    # interval_start (per-minute) -- that's textbook over-partitioning (one tiny
+    # file per row). product_id is left to Z-ordering (Day 14 / optimize.py),
+    # since 2 products don't justify a partition dimension.
+    gold = to_gold(silver, INTERVAL).withColumn("date", F.to_date("interval_start"))
 
-    gold.write.format("delta").mode("overwrite").save(GOLD_PATH)
+    (
+        gold.write.format("delta")
+        .mode("overwrite")
+        .partitionBy("date")
+        .option("overwriteSchema", "true")
+        .save(GOLD_PATH)
+    )
 
     total = _count(spark, GOLD_PATH)
     print(f"gold candles written: {total}")

@@ -1,7 +1,7 @@
 # 0009. Gold-table partitioning strategy
 
-- **Status:** Proposed (to be decided Day 14, once gold tables hold real data)
-- **Date:** _TBD_
+- **Status:** Accepted
+- **Date:** 2026-07-12
 
 ## Context
 
@@ -9,24 +9,40 @@ Physical data layout determines query cost on a lakehouse. Partitioning splits a
 table into subdirectories by column value so the engine can **prune** irrelevant
 data. But the choice is a real tradeoff: partitioning on a high-cardinality
 column (or too fine a time grain) creates the **small-files problem** — thousands
-of tiny files that *slow* reads and bloat metadata. This can only be decided
-meaningfully against populated tables and measured query patterns, which don't
-exist until Week 2.
+of tiny files that *slow* reads and bloat metadata.
+
+Gold OHLC holds ~572 candles across two products and two calendar days at Week-2
+scale — enough to decide layout principles, not enough for dramatic latency wins.
 
 ## Decision
 
-_Deferred._ Candidate: partition gold by **event date** (and possibly
-`product_id`), sized to the observed volume. To be finalized on Day 14 with
-before/after measurements. This ADR is reserved now so the decision is explicit
-and not forgotten.
+Partition **`gold/ohlc` by `date`** (`to_date(interval_start)`), **not** by
+`product_id` or minute-level `interval_start`.
+
+- **`date`** matches the typical analytical filter (“trades/candles for July 7”)
+  with low cardinality (one directory per calendar day).
+- **`product_id`** is deferred to **Z-ordering** ([ADR 0010](./0010-zorder-vs-liquid-clustering.md))
+  — only two products, so a partition dimension would barely prune.
+- **Minute grain** would be textbook **over-partitioning** (~one file per row at
+  our candle grain).
+
+Silver and bronze remain unpartitioned; streaming append + periodic `OPTIMIZE`
+is the right maintenance model there first.
 
 ## Consequences
 
-_To be filled on Day 14, including measured file counts and query times before
-vs. after, and the over-partitioning pitfalls actually observed._
+- Queries filtering by `date` skip other date directories (`SHOW PARTITIONS` in
+  [`optimize.py`](../spark_jobs/optimize.py) confirms layout).
+- Re-running `gold_aggregate.py` with `overwriteSchema=true` rebuilds the
+  partitioned table from silver.
+- Adding many more products or years increases partition count linearly by **days**,
+  not by rows — the intended scaling shape.
 
 ## Alternatives considered
 
-_To be filled on Day 14 (no partitioning; partition by date; date + product;
-superseded entirely by liquid clustering — see
-[ADR 0010](./0010-zorder-vs-liquid-clustering.md))._
+| Alternative | Why not (here) |
+|---|---|
+| No partitioning | Simpler, but no directory pruning as gold grows |
+| Partition by `product_id` | Only 2 values → ~50% scan anyway; Z-order handles product filters inside files |
+| Partition by `date` + `product_id` | Doubles directory count for negligible gain at 2 products |
+| Liquid clustering instead | Evaluated separately — see ADR 0010; not supported cleanly on Delta 3.2.0 |

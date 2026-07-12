@@ -131,20 +131,21 @@ the gold tables in Week 2 — see the reserved ADRs
 
 | Week | Milestone | Status |
 |---|---|---|
-| 1 | Live data flowing into Kafka, containerized, verified, documented | **in progress (Day 7)** |
-| 2 | Full Lambda pipeline end-to-end in Compose | pending |
+| 1 | Live data flowing into Kafka, containerized, verified, documented | **complete** |
+| 2 | Full Lambda pipeline end-to-end in Compose | **complete (Day 14)** |
 | 3 | Production rigor: DQ, idempotency, replay, orchestration, tests, CI | pending |
 | 4 | Serving + Kubernetes deployment + documentation | pending |
 
-**Week 1 to date:** repo/tooling scaffolding (uv, ruff, mypy, pytest,
-pre-commit); documented Coinbase feed study; single-broker Kafka (KRaft) in
-Compose with a 6-partition topic; a fault-tolerant, idempotent producer,
-containerized and wired into Compose; a verification consumer + formal `Trade`
-data contract with tests.
+**Week 2 to date:** Spark + Delta + MinIO; bronze streaming ingestion (exactly-once);
+silver parse/type/dedup; batch gold OHLC/VWAP candles; speed-layer rolling metrics;
+date-partitioned gold + `OPTIMIZE`/Z-order/VACUUM toolkit; end-to-end runbook.
+See [`docs/runbook.md`](./docs/runbook.md).
 
 ## 9. Where to read more
 
 - Feed study & market-data gotchas: [`docs/coinbase_websocket_schema.md`](./docs/coinbase_websocket_schema.md)
 - Kafka setup & partition rationale: [`docs/kafka_setup.md`](./docs/kafka_setup.md)
 - Data contract: [`docs/data_contract.md`](./docs/data_contract.md)
+- End-to-end runbook: [`docs/runbook.md`](./docs/runbook.md)
+- Data layout & optimization: [`docs/data_layout.md`](./docs/data_layout.md)
 - All decisions with alternatives: [`docs/adr/`](./docs/adr/)

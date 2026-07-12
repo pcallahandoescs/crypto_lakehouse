@@ -59,6 +59,14 @@ yields identical output, no duplicates. That's fine while the dataset is small;
 recomputing all history every run is wasteful at scale, so **Day 16** upgrades
 this to an incremental **`MERGE`/upsert** keyed on the grain.
 
+## Partitioning (Day 14)
+
+Gold is **partitioned by `date`** (`to_date(interval_start)`). Typical queries
+filter a calendar day, so Delta can **prune** whole directories. We deliberately
+do **not** partition by minute (`interval_start`) — that would create one tiny
+file per candle. `product_id` is handled by **Z-ordering** instead (see
+[`data_layout.md`](./data_layout.md)).
+
 ## Run it
 
 ```bash

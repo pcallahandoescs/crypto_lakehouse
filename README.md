@@ -5,13 +5,13 @@
 > medallion architecture on MinIO, orchestrated with Airflow, served via FastAPI +
 > a live dashboard, and deployed on Kubernetes.
 
-**Status:** Building in public — **Week 1, Day 7 (Week 1 review & docs)**. Live
-trades flow into Kafka, containerized and verified against a formal data
-contract. The build progresses in weekly milestones (see the
-[Roadmap](#roadmap) below).
+**Status:** Building in public — **Week 2 complete (Day 14 — full Lambda pipeline
+end-to-end in Compose)**. Live trades flow Kafka → bronze → silver → gold, plus a
+real-time speed layer. See the [runbook](./docs/runbook.md) to reproduce the stack.
 
 Full design and the reasoning behind every choice:
-[`ARCHITECTURE.md`](./ARCHITECTURE.md) · decisions log [`docs/adr/`](./docs/adr/).
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) · decisions log [`docs/adr/`](./docs/adr/) ·
+[runbook](./docs/runbook.md).
 
 ---
 
@@ -98,7 +98,7 @@ Quality tooling: **ruff** (lint + format), **mypy** (strict typing), **pytest**.
 ## Roadmap
 
 - **Week 1** — Foundations & ingestion: live data flowing into Kafka, containerized.
-- **Week 2** — Lakehouse & processing: full Lambda pipeline end-to-end in Compose.
+- **Week 2** — Lakehouse & processing: full Lambda pipeline end-to-end in Compose. **Done.**
 - **Week 3** — Production rigor: data quality, idempotency, replay, orchestration, tests.
 - **Week 4** — Serving & deployment: FastAPI + dashboard, Kubernetes + Helm, docs.
 

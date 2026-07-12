@@ -1,0 +1,143 @@
+# Runbook: start the full stack & verify end-to-end
+
+Week 2 milestone: a complete **Lambda** pipeline in Docker Compose — live
+Coinbase trades → Kafka → bronze → silver → gold (batch) **and** gold_realtime
+(speed layer).
+
+## Prerequisites
+
+- Docker Desktop running (give it **6–8 GB RAM** if you run Spark alongside Kafka)
+- Repo cloned, `uv` installed for local Python tooling
+
+## 1. Start the backbone
+
+```bash
+docker compose up -d kafka minio producer createbuckets
+docker compose ps          # kafka healthy, minio + producer up
+```
+
+Create the Kafka topic once (idempotent):
+
+```bash
+./scripts/create_topics.sh
+```
+
+## 2. Batch layer (bronze → silver → gold)
+
+Run each job in order. Use quotes around `"local[*]"` in zsh.
+
+**Bronze** — stream Kafka → Delta (Ctrl+C after a few batches, or let it tail):
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g bronze_ingest.py
+```
+
+**Silver** — parse, type, dedup bronze → silver:
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g silver_transform.py
+```
+
+**Gold** — OHLC candles + VWAP (batch, partitioned by `date`):
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g gold_aggregate.py
+```
+
+## 3. Speed layer (real-time metrics)
+
+Needs **live** trades (`startingOffsets=latest`). Leave running ~3 minutes so
+watermarked windows finalize:
+
+```bash
+docker compose start producer   # if stopped
+
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g speed_metrics.py
+```
+
+## 4. Verify counts (the smoke check)
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" counts.py
+```
+
+Expected shape:
+
+| Check | What “good” looks like |
+|---|---|
+| `silver dedup clean?` | `True` (rows == distinct `(product_id, trade_id)`) |
+| `gold grain clean?` | `True` (rows == distinct `(product_id, interval_start)`) |
+| `gold_realtime rows` | `> 0` after the speed job ran long enough |
+
+Browse tables in the MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`).
+
+## 5. Data layout (Day 14)
+
+After gold is populated, compact and Z-order:
+
+```bash
+# bronze: many small streaming files -> fewer, larger files
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" optimize.py s3a://bronze/trades
+
+# gold: compaction + Z-order by product_id for data skipping
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" optimize.py s3a://gold/ohlc product_id
+```
+
+Probe liquid clustering support (OSS Delta 3.2):
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" liquid_cluster_probe.py
+```
+
+See [`data_layout.md`](./data_layout.md) for the concepts and how to read the
+before/after numbers.
+
+## 6. Useful debug commands
+
+```bash
+# Producer publishing?
+docker compose logs --tail 10 producer
+
+# Peek Kafka (host listener)
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic crypto.trades.raw \
+  --max-messages 3
+
+# Local Python quality gate
+make check
+```
+
+## 7. Stop / reset
+
+```bash
+docker compose stop                    # stop services, keep data volumes
+docker compose down                  # stop + remove containers
+docker compose down -v               # ⚠ also deletes kafka/minio data
+```
+
+To re-ingest from scratch: delete bronze/silver/gold paths in MinIO **and** their
+`_checkpoints/` directories — checkpoints are part of each stream's contract.
+
+## Architecture at a glance
+
+```
+Coinbase WS → producer → Kafka
+                          ├→ bronze_ingest (stream) → bronze/trades
+                          │                              ↓
+                          │                         silver_transform (stream) → silver/trades
+                          │                              ↓
+                          │                         gold_aggregate (batch) → gold/ohlc
+                          └→ speed_metrics (stream) → gold/realtime_metrics
+```
+
+Both paths share Kafka as the source; the speed layer reads it **directly** so
+batch stalls never block real-time metrics.
