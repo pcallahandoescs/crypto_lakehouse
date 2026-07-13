@@ -100,7 +100,18 @@ docker compose run --rm spark \
 See [`data_layout.md`](./data_layout.md) for the concepts and how to read the
 before/after numbers.
 
-## 6. Useful debug commands
+## 6. Data quality (Day 15)
+
+After silver and gold are populated:
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" dq_validate.py
+```
+
+Expect all checks **PASS** on clean data. See [`data_quality.md`](./data_quality.md).
+
+## 7. Useful debug commands
 
 ```bash
 # Producer publishing?
@@ -116,7 +127,7 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
 make check
 ```
 
-## 7. Stop / reset
+## 8. Stop / reset
 
 ```bash
 docker compose stop                    # stop services, keep data volumes

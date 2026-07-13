@@ -52,6 +52,10 @@ target-version = "py311"
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C4", "PTH", "RUF"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+# Spark Docker image ships Python 3.10; datetime.UTC is 3.11+.
+"spark_jobs/**/*.py" = ["UP017"]
+
 [tool.ruff.format]
 docstring-code-format = true
 

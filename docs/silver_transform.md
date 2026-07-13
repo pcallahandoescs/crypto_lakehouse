@@ -37,8 +37,8 @@ can't parse becomes **null**:
 We then keep only rows where the identity + money + time fields are non-null
 (`trade_id`, `product_id`, `price`, `size`, `time`). That single filter rejects
 both junk messages we planted on Day 3, which is the "drop malformed rows" step.
-(A stricter design would *quarantine* rejects into a side table for inspection
-rather than silently dropping them — a Day 15 data-quality refinement.)
+(A stricter design quarantines rejects into a side table — implemented on
+**Day 15**; see [`data_quality.md`](./data_quality.md).)
 
 ## Deduplication + watermark (the idempotency seed)
 

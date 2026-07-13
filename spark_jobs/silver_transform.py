@@ -1,9 +1,9 @@
 """Day 11: bronze -> silver (parse, type, conform, deduplicate).
 
 Bronze is the raw JSON string as it arrived. Silver is the *trustworthy* table:
-each trade parsed into real typed columns, malformed rows dropped, and duplicates
-removed on the natural key (product_id, trade_id). This is the first layer other
-people/jobs are meant to actually query.
+each trade parsed into real typed columns, malformed rows quarantined (Day 15),
+and duplicates removed on the natural key (product_id, trade_id). This is the
+first layer other people/jobs are meant to actually query.
 
 "Conformed" means: one canonical shape and semantics for a trade -- decimals for
 money (never float), a real event-time timestamp, standardized column names --
@@ -11,7 +11,8 @@ regardless of the source's quirks. Everything downstream (gold aggregates, the
 speed layer) can trust silver's schema and uniqueness.
 
 Runs as a stream: readStream from the bronze Delta table, writeStream to silver.
-Its own checkpoint (separate from bronze's) gives exactly-once + resume.
+Invalid parse/contract rows go to a **quarantine** table instead of being silently
+dropped. Its own checkpoint (separate from bronze's) gives exactly-once + resume.
 
 Run (let it stream, then Ctrl+C):
     docker compose run --rm spark \
@@ -21,32 +22,37 @@ Run (let it stream, then Ctrl+C):
 from __future__ import annotations
 
 from common import TRADE_SCHEMA, build_spark
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, current_timestamp, from_json
+from dq import SILVER_QUARANTINE_PATH
+from pyspark.sql import Column, DataFrame
+from pyspark.sql.functions import col, current_timestamp, from_json, lit
 
 BRONZE_PATH = "s3a://bronze/trades"
 SILVER_PATH = "s3a://silver/trades"
 CHECKPOINT_PATH = "s3a://silver/_checkpoints/trades"
+QUARANTINE_CHECKPOINT_PATH = "s3a://silver/_checkpoints/quarantine"
 
 
-def to_silver(bronze: DataFrame) -> DataFrame:
-    """Parse the raw JSON, keep only valid trades, conform + dedup."""
-    parsed = bronze.select(
-        from_json(col("value"), TRADE_SCHEMA).alias("t"),
-        col("ingest_timestamp"),
-    )
-
-    # Drop malformed rows: unparseable JSON -> t is null; JSON missing the key
-    # fields -> those fields are null. Requiring the identity + money + time
-    # fields is enough to reject both the "hello kafka" and {"test":"trade"}
-    # junk we planted on Day 3.
-    valid = parsed.where(
+def _is_valid_trade() -> Column:
+    return (
         col("t.trade_id").isNotNull()
         & col("t.product_id").isNotNull()
         & col("t.price").isNotNull()
         & col("t.size").isNotNull()
         & col("t.time").isNotNull()
     )
+
+
+def parse_bronze(bronze: DataFrame) -> DataFrame:
+    return bronze.select(
+        col("value"),
+        col("ingest_timestamp"),
+        from_json(col("value"), TRADE_SCHEMA).alias("t"),
+    )
+
+
+def to_silver(parsed: DataFrame) -> DataFrame:
+    """Parse the raw JSON, keep only valid trades, conform + dedup."""
+    valid = parsed.where(_is_valid_trade())
 
     conformed = valid.select(
         col("t.product_id").alias("product_id"),
@@ -61,13 +67,18 @@ def to_silver(bronze: DataFrame) -> DataFrame:
         col("ingest_timestamp"),
     ).withColumn("silver_timestamp", current_timestamp())
 
-    # Deduplicate on the natural key. The watermark bounds how long we remember
-    # seen keys (state), so this doesn't grow unboundedly: trades older than the
-    # watermark are assumed no longer arriving and their keys are evicted.
-    # dropDuplicatesWithinWatermark (Spark 3.5+) dedups by key within that window
-    # without requiring event_time to be part of the key.
     return conformed.withWatermark("event_time", "1 hour").dropDuplicatesWithinWatermark(
         ["product_id", "trade_id"]
+    )
+
+
+def to_quarantine(parsed: DataFrame) -> DataFrame:
+    """Rows that fail parse/contract checks — auditable, not silently dropped."""
+    return parsed.where(~_is_valid_trade()).select(
+        col("value"),
+        col("ingest_timestamp"),
+        lit("parse_or_contract_failure").alias("reason"),
+        current_timestamp().alias("quarantined_at"),
     )
 
 
@@ -75,17 +86,14 @@ def main() -> None:
     spark = build_spark("silver-transform")
     spark.sparkContext.setLogLevel("WARN")
     print(f"silver transform: {BRONZE_PATH} -> {SILVER_PATH}")
+    print(f"  quarantine: {SILVER_QUARANTINE_PATH}")
 
-    # maxFilesPerTrigger bounds how many bronze files each micro-batch reads, so
-    # the initial backlog is processed in chunks instead of one giant batch that
-    # would blow the driver's heap (the Day-11 OOM lesson).
     bronze = spark.readStream.format("delta").option("maxFilesPerTrigger", "64").load(BRONZE_PATH)
-    silver = to_silver(bronze)
+    parsed = parse_bronze(bronze)
+    silver = to_silver(parsed)
+    quarantine = to_quarantine(parsed)
 
-    # No mergeSchema here -> Delta *enforces* silver's schema: a drifted/extra
-    # column would make the write fail loudly rather than silently corrupt the
-    # table. Schema *evolution* (opt-in mergeSchema) is exercised on Day 21.
-    query = (
+    silver_query = (
         silver.writeStream.format("delta")
         .outputMode("append")
         .option("checkpointLocation", CHECKPOINT_PATH)
@@ -93,14 +101,19 @@ def main() -> None:
         .start(SILVER_PATH)
     )
 
-    # Only print when the batch id changes: during a backlog, many batches run
-    # between our 10s samples, and printing repeated idle ticks is misleading
-    # (it looks like fewer rows were processed than actually were).
+    quarantine_query = (
+        quarantine.writeStream.format("delta")
+        .outputMode("append")
+        .option("checkpointLocation", QUARANTINE_CHECKPOINT_PATH)
+        .trigger(processingTime="10 seconds")
+        .start(SILVER_QUARANTINE_PATH)
+    )
+
     last_batch = -1
     try:
-        while query.isActive:
-            query.awaitTermination(10)
-            progress = query.lastProgress
+        while silver_query.isActive:
+            silver_query.awaitTermination(10)
+            progress = silver_query.lastProgress
             if progress is not None and progress["batchId"] != last_batch:
                 last_batch = progress["batchId"]
                 print(
@@ -110,7 +123,8 @@ def main() -> None:
                 )
     except KeyboardInterrupt:
         print("stopping stream...")
-        query.stop()
+        silver_query.stop()
+        quarantine_query.stop()
 
     spark.stop()
 

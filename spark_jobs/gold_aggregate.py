@@ -27,6 +27,7 @@ from __future__ import annotations
 import os
 
 from common import build_spark
+from dq import alert, check_gold, load_prior_row_count, save_metrics
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
@@ -98,6 +99,11 @@ def main() -> None:
 
     total = _count(spark, GOLD_PATH)
     print(f"gold candles written: {total}")
+
+    prior = load_prior_row_count(spark, "gold/ohlc")
+    gold_df = spark.read.format("delta").load(GOLD_PATH)
+    alert(check_gold(gold_df, total, prior), layer="gold")
+    save_metrics(spark, "gold/ohlc", total)
 
     print("\nmost recent candles:")
     (
