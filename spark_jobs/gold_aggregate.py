@@ -1,4 +1,4 @@
-"""Day 12: silver -> gold (OHLC candles + VWAP + volume).
+"""Day 12/16: silver -> gold (OHLC candles + VWAP + volume).
 
 Gold is the analytical product: the thing consumers (a dashboard, an analyst, a
 model) actually query. We roll individual trades up into **candles** -- one row
@@ -13,9 +13,9 @@ Grain (the most important thing to be able to state): **one row per product per
 interval**. The interval is a tumbling (non-overlapping) window, 1 minute by
 default.
 
-Batch job: read all of silver, recompute candles, overwrite gold. Overwrite makes
-it naturally idempotent (rerun -> identical output); Day 16 upgrades this to an
-incremental MERGE.
+Batch job: read all of silver, recompute candles, **MERGE upsert** into gold on
+(product_id, interval_start). Safe to re-run — matched rows update in place,
+no duplicates (Day 16).
 
 Run:
     docker compose run --rm spark \
@@ -28,11 +28,13 @@ import os
 
 from common import build_spark
 from dq import alert, check_gold, load_prior_row_count, save_metrics
+from idempotent import merge_condition, merge_upsert
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 SILVER_PATH = "s3a://silver/trades"
 GOLD_PATH = "s3a://gold/ohlc"
+GOLD_MERGE_KEYS = ("product_id", "interval_start")
 # Tumbling-window size. Same job, different value, gives 5-minute candles, etc.
 INTERVAL = os.getenv("GOLD_INTERVAL", "1 minute")
 
@@ -76,26 +78,25 @@ def to_gold(silver: DataFrame, interval: str) -> DataFrame:
     )
 
 
+def write_gold(spark: SparkSession, gold: DataFrame) -> None:
+    """Idempotent upsert on the grain key; partition by date for pruning."""
+    merge_upsert(
+        spark,
+        GOLD_PATH,
+        gold,
+        merge_condition(GOLD_MERGE_KEYS),
+        partition_by=["date"],
+    )
+
+
 def main() -> None:
     spark = build_spark("gold-aggregate")
     spark.sparkContext.setLogLevel("WARN")
     print(f"gold aggregate: {SILVER_PATH} -> {GOLD_PATH} (interval={INTERVAL})")
 
     silver = spark.read.format("delta").load(SILVER_PATH)
-    # Partition by event date: typical queries filter a date/time range, so
-    # date-partitioning lets Delta prune whole directories. Deliberately NOT by
-    # interval_start (per-minute) -- that's textbook over-partitioning (one tiny
-    # file per row). product_id is left to Z-ordering (Day 14 / optimize.py),
-    # since 2 products don't justify a partition dimension.
     gold = to_gold(silver, INTERVAL).withColumn("date", F.to_date("interval_start"))
-
-    (
-        gold.write.format("delta")
-        .mode("overwrite")
-        .partitionBy("date")
-        .option("overwriteSchema", "true")
-        .save(GOLD_PATH)
-    )
+    write_gold(spark, gold)
 
     total = _count(spark, GOLD_PATH)
     print(f"gold candles written: {total}")

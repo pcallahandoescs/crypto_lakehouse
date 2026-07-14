@@ -50,11 +50,10 @@ def parse_bronze(bronze: DataFrame) -> DataFrame:
     )
 
 
-def to_silver(parsed: DataFrame) -> DataFrame:
-    """Parse the raw JSON, keep only valid trades, conform + dedup."""
+def conform_trades(parsed: DataFrame) -> DataFrame:
+    """Valid bronze rows conformed to the silver schema (batch + streaming)."""
     valid = parsed.where(_is_valid_trade())
-
-    conformed = valid.select(
+    return valid.select(
         col("t.product_id").alias("product_id"),
         col("t.trade_id").alias("trade_id"),
         col("t.side").alias("side"),
@@ -67,8 +66,13 @@ def to_silver(parsed: DataFrame) -> DataFrame:
         col("ingest_timestamp"),
     ).withColumn("silver_timestamp", current_timestamp())
 
-    return conformed.withWatermark("event_time", "1 hour").dropDuplicatesWithinWatermark(
-        ["product_id", "trade_id"]
+
+def to_silver(parsed: DataFrame) -> DataFrame:
+    """Streaming silver: conform + watermark dedup."""
+    return (
+        conform_trades(parsed)
+        .withWatermark("event_time", "1 hour")
+        .dropDuplicatesWithinWatermark(["product_id", "trade_id"])
     )
 
 

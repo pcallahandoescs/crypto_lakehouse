@@ -111,7 +111,16 @@ docker compose run --rm spark \
 
 Expect all checks **PASS** on clean data. See [`data_quality.md`](./data_quality.md).
 
-## 7. Useful debug commands
+## 7. Idempotency proof (Day 16)
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g prove_idempotency.py
+```
+
+See [`idempotency.md`](./idempotency.md).
+
+## 8. Useful debug commands
 
 ```bash
 # Producer publishing?
@@ -127,7 +136,7 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
 make check
 ```
 
-## 8. Stop / reset
+## 9. Stop / reset
 
 ```bash
 docker compose stop                    # stop services, keep data volumes
