@@ -120,7 +120,29 @@ docker compose run --rm spark \
 
 See [`idempotency.md`](./idempotency.md).
 
-## 8. Useful debug commands
+## 8. Backfill (Day 17)
+
+Reprocess a date range from **immutable bronze** into silver and gold (MERGE
+upserts — safe to re-run). Bounds are UTC: `[--start, --end)` (end exclusive).
+
+```bash
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" backfill.py --show-range
+
+# Two commands on Docker Desktop (avoids OOM / exit 137):
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g \
+    backfill.py --start 2026-07-05 --end 2026-07-06 --skip-gold
+
+docker compose run --rm spark \
+    /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g \
+    backfill.py --start 2026-07-05 --end 2026-07-06 --skip-silver
+```
+
+Partial runs: `--skip-gold` (silver only) or `--skip-silver` (gold only). See
+[`backfill.md`](./backfill.md) for replay semantics and the Kappa tie-in.
+
+## 9. Useful debug commands
 
 ```bash
 # Producer publishing?
@@ -136,7 +158,7 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
 make check
 ```
 
-## 9. Stop / reset
+## 10. Stop / reset
 
 ```bash
 docker compose stop                    # stop services, keep data volumes
