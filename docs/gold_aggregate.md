@@ -51,13 +51,11 @@ So `price*size` and the `sum(size)` used for the ratio are cast to `double`; the
 reported `volume` and OHLC prices remain exact decimals. This is a deliberate,
 documented trade-off — exactness where it's money, pragmatism where it's a mean.
 
-## Batch + idempotent-by-overwrite
+## Batch + idempotent MERGE (Day 16)
 
-This is a **batch** job (not streaming): read all of silver, recompute every
-candle, `overwrite` gold. Overwrite makes it **idempotent** — running it twice
-yields identical output, no duplicates. That's fine while the dataset is small;
-recomputing all history every run is wasteful at scale, so **Day 16** upgrades
-this to an incremental **`MERGE`/upsert** keyed on the grain.
+Batch job: read all of silver, recompute candles, **MERGE upsert** into gold on
+`(product_id, interval_start)`. Re-running updates matched rows in place — no
+duplicates. See [`idempotency.md`](./idempotency.md).
 
 ## Partitioning (Day 14)
 
