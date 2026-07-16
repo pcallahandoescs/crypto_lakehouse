@@ -139,10 +139,20 @@ docker compose run --rm spark \
     backfill.py --start 2026-07-05 --end 2026-07-06 --skip-silver
 ```
 
-Partial runs: `--skip-gold` (silver only) or `--skip-silver` (gold only). See
-[`backfill.md`](./backfill.md) for replay semantics and the Kappa tie-in.
+See [`backfill.md`](./backfill.md).
 
-## 9. Useful debug commands
+## 9. Airflow (Day 18)
+
+```bash
+docker compose --profile orchestration up -d
+# UI: http://localhost:8088  (admin / admin)
+curl -sf http://localhost:8088/health && echo " ok"
+```
+
+Unpause and trigger `example_lakehouse` in the UI to smoke-test. See
+[`airflow.md`](./airflow.md).
+
+## 10. Useful debug commands
 
 ```bash
 # Producer publishing?
@@ -158,7 +168,7 @@ docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh \
 make check
 ```
 
-## 10. Stop / reset
+## 11. Stop / reset
 
 ```bash
 docker compose stop                    # stop services, keep data volumes
