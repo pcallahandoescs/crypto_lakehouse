@@ -154,11 +154,34 @@ services:
     command: ["/opt/spark/bin/spark-submit", "--master", "local[*]", "test_delta.py"]
 
   # ----------------------------------------------------------------------------
-  # Airflow (Day 18): orchestration for batch jobs + backfills (DAGs in Day 19).
-  # LocalExecutor = scheduler runs tasks in-process (fine for local dev).
-  # Start with: docker compose --profile orchestration up -d
+  # Airflow (Day 18–19): orchestration for batch jobs + backfills.
+  # Scheduler submits Spark via Docker Compose (socket + project mount).
   # UI: http://localhost:8088 (admin / admin)
+  # Build Spark image first: docker compose --profile jobs build spark
   # ----------------------------------------------------------------------------
+  x-airflow-common: &airflow-common
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    image: crypto-lakehouse-airflow:2.10.4
+    profiles: ["orchestration"]
+    environment: &airflow-common-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: "46BKJoQYlFOTFCJ63CrKo653k3TAD3pQELN12R4Xy1DBHsTJ9qK7ue="
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      LAKEHOUSE_PROJECT_DIR: /opt/project
+      LAKEHOUSE_HOST_DIR: ${PWD}
+      LAKEHOUSE_DOCKER_NETWORK: crypto_pipeline_project_default
+      SPARK_IMAGE: crypto-lakehouse-spark:3.5.3
+      SPARK_DRIVER_MEMORY: 2g
+    volumes: &airflow-common-volumes
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    user: "50000:0"
+
   postgres:
     image: postgres:16-alpine
     container_name: airflow-postgres
@@ -177,27 +200,17 @@ services:
     restart: unless-stopped
 
   airflow-init:
-    image: apache/airflow:2.10.4-python3.11
+    <<: *airflow-common
     container_name: airflow-init
-    profiles: ["orchestration"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: "46BKJoQYlFOTFCJ63CrKo653k3TAD3pQELN12R4Xy1DBHsTJ9qK7ue="
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    user: "50000:0"
     entrypoint: /bin/bash
     command:
       - -c
@@ -212,25 +225,16 @@ services:
           --email admin@example.com || true
 
   airflow-webserver:
-    image: apache/airflow:2.10.4-python3.11
+    <<: *airflow-common
     container_name: airflow-webserver
-    profiles: ["orchestration"]
     depends_on:
       postgres:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: "46BKJoQYlFOTFCJ63CrKo653k3TAD3pQELN12R4Xy1DBHsTJ9qK7ue="
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-    user: "50000:0"
+      <<: *airflow-common-env
+    volumes: *airflow-common-volumes
     command: webserver
     ports:
       - "8088:8080"
@@ -243,25 +247,23 @@ services:
     restart: unless-stopped
 
   airflow-scheduler:
-    image: apache/airflow:2.10.4-python3.11
+    <<: *airflow-common
     container_name: airflow-scheduler
-    profiles: ["orchestration"]
     depends_on:
       postgres:
         condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: "46BKJoQYlFOTFCJ63CrKo653k3TAD3pQELN12R4Xy1DBHsTJ9qK7ue="
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      <<: *airflow-common-env
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
-    user: "50000:0"
+      - .:/opt/project
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Dev-only: root so LocalExecutor can reach the mounted Docker socket (Day 19).
+    user: "0:0"
     command: scheduler
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]

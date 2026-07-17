@@ -1,9 +1,8 @@
-# Orchestration with Airflow (Day 18)
+# Orchestration with Airflow (Day 18–19)
 
 Airflow coordinates **batch** work: scheduled silver → gold runs, DQ validation,
 and parameterized backfills. Streaming jobs (bronze ingest, silver transform,
-speed layer) stay long-running outside Airflow — orchestration targets jobs with
-a clear start and end.
+speed layer) stay long-running outside Airflow.
 
 ## Why orchestration?
 
@@ -14,90 +13,113 @@ a clear start and end.
 | One failure aborts the shell script | **Retries** with backoff per task |
 | No history of what ran when | **UI + metadata DB** — audit trail |
 
-Airflow does not replace Spark — it **submits** Spark jobs (Day 19) and tracks
-their lifecycle.
+Airflow does not replace Spark — it **submits** Spark jobs via Docker Compose and
+tracks their lifecycle.
 
 ## Architecture (local)
 
 ```
-postgres          ← Airflow metadata (DAG runs, task state, connections)
+postgres          ← Airflow metadata (DAG runs, task state)
 airflow-webserver ← UI on http://localhost:8088
-airflow-scheduler ← parses DAGs, queues tasks (LocalExecutor runs them in-process)
-airflow/dags/     ← Python DAG files (mounted into containers)
+airflow-scheduler ← parses DAGs, runs tasks (LocalExecutor + Docker socket)
+airflow/dags/     ← batch_lakehouse, backfill_lakehouse, example_lakehouse
 ```
 
-**LocalExecutor** is enough for laptop dev: the scheduler process executes tasks
-directly. Production would use Celery/Kubernetes executors for isolation and scale.
-
-## Start Airflow
-
-Requires the backbone (MinIO/Kafka) only if DAGs call Spark — the UI itself needs
-just Postgres + Airflow:
+The scheduler container mounts `/var/run/docker.sock` and sets `LAKEHOUSE_HOST_DIR`
+to the repo path on your Mac (`${PWD}` when you `docker compose up`). Each task runs:
 
 ```bash
-docker compose --profile orchestration up -d postgres airflow-init airflow-webserver airflow-scheduler
+docker run --rm --network crypto_pipeline_project_default \
+  -v "$HOST_DIR/spark_jobs:/opt/spark/work-dir" \
+  crypto-lakehouse-spark:3.5.3 \
+  /opt/spark/bin/spark-submit --master "local[*]" --driver-memory 2g <job>.py
 ```
 
-Or shorthand (starts init once, then webserver + scheduler):
+(`docker run`, not `docker compose run` — bind mounts must use **host** paths.)
+
+## Prerequisites
+
+Build images once:
+
+```bash
+docker compose --profile jobs build spark
+docker compose --profile orchestration build airflow-scheduler
+```
+
+Backbone must be up (MinIO + Kafka) before batch DAG tasks run:
+
+```bash
+docker compose up -d kafka minio producer createbuckets
+```
+
+## Start Airflow
 
 ```bash
 docker compose --profile orchestration up -d
 ```
 
-Wait ~30s, then open **http://localhost:8088**
-
-(Port **8088** on the host — 8080 is often taken by other local services.)
-
-| Field | Value |
-|---|---|
-| Username | `admin` |
-| Password | `admin` |
-
-Check health:
+Open **http://localhost:8088** (`admin` / `admin`). Port **8088** avoids clashes
+with other services on 8080.
 
 ```bash
-docker compose --profile orchestration ps
-curl -sf http://localhost:8088/health && echo " webserver ok"
+curl -sf http://localhost:8088/health && echo " ok"
 ```
 
-## Smoke-test DAG
+## DAGs (Day 19)
 
-[`example_dag.py`](../airflow/dags/example_dag.py) defines `example_lakehouse` —
-a single Python task that prints a confirmation string.
+| DAG | Schedule | Tasks | Purpose |
+|---|---|---|---|
+| **`batch_lakehouse`** | `0 3 * * *` (03:00 UTC daily) | gold_aggregate_btc + gold_aggregate_eth → dq_validate | One product per Spark container (Docker memory) |
+| **`backfill_lakehouse`** | Manual only | backfill_silver → backfill_gold | Parameterized date-range replay (includes silver MERGE) |
+| `example_lakehouse` | Manual | hello task | Day 18 smoke test |
 
-1. Open the UI → **DAGs**
-2. Find `example_lakehouse` (paused by default)
-3. Toggle **Unpause**
-4. Click **Trigger DAG** (play button)
-5. Open the run → **Graph** → task should go green
+All DAGs are **paused at creation** — unpause before the schedule fires or trigger
+manually.
 
-DAGs are **paused at creation** (`AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION`) so
-a typo in new code does not immediately flood the scheduler.
+### Run the batch DAG manually
+
+1. UI → **batch_lakehouse** → Unpause → **Trigger DAG**
+2. Graph: `gold_aggregate_btc` → `gold_aggregate_eth` → `dq_validate` (sequential — not parallel; avoids OOM)
+3. Task logs show `docker run ... spark-submit` output
+
+**Note:** `silver_batch.py` is intentionally **not** in this DAG — a full bronze→silver
+MERGE over ~165k rows OOMs on Docker Desktop (exit 137). Use **backfill_lakehouse**
+when you need to reprocess silver from bronze.
+
+Default retries: **2** with 5-minute delay between attempts.
+
+### Run the backfill DAG
+
+1. UI → **backfill_lakehouse** → **Trigger DAG w/ config**
+2. JSON params (match your bronze event-time span):
+
+```json
+{
+  "start_date": "2026-07-05",
+  "end_date": "2026-07-08"
+}
+```
+
+3. Graph: `backfill_silver` (--skip-gold) → `backfill_gold` (--skip-silver)
+
+Two tasks mirror the Day 17 OOM-safe CLI pattern.
 
 ## Repository layout
 
 ```
 airflow/
-  dags/       # Python DAG files (Day 19: batch + backfill DAGs)
-  plugins/    # custom hooks/operators (empty for now)
-  logs/       # task logs (gitignored, created at runtime)
+  Dockerfile    # Airflow + Docker CLI for compose submits
+  dags/         # DAG definitions
+  plugins/
+    lakehouse/
+      spark_compose.py   # shared spark-submit bash helper
+  logs/         # task logs (gitignored)
 ```
-
-## Day 19 preview
-
-Next up:
-
-- **Batch DAG** — silver batch → gold aggregate → `dq_validate.py`, with retries
-- **Backfill DAG** — parameterized `--start` / `--end` calling `backfill.py`
-
-Those DAGs will use `DockerOperator` (or `docker compose run`) to submit the
-existing Spark job container against MinIO.
 
 ## Stop
 
 ```bash
 docker compose --profile orchestration down
-# add -v to wipe postgres metadata (DAG run history)
 ```
 
 ## Alternatives considered
@@ -105,7 +127,7 @@ docker compose --profile orchestration down
 | Tool | Why not (for this project) |
 |---|---|
 | **Cron + shell scripts** | No dependency graph, retries, or UI |
-| **Prefect / Dagster** | Strong modern choices; Airflow is the industry default and matches README target |
-| **Spark-only scheduling** | Spark has no first-class cross-job orchestration or backfill UI |
+| **Prefect / Dagster** | Strong modern choices; Airflow matches README target |
+| **Spark-only scheduling** | No cross-job orchestration or backfill UI |
 
 See [`docs/adr/0012-orchestration-airflow.md`](./adr/0012-orchestration-airflow.md).

@@ -43,7 +43,7 @@ python-preference = "only-managed"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["airflow/dags"]
+extend-exclude = ["airflow/dags", "airflow/plugins"]
 
 [tool.ruff.lint]
 # A pragmatic-but-strict rule set. Each code is a family of checks:

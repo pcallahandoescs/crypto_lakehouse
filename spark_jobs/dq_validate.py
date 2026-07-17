@@ -7,17 +7,23 @@ and records row counts for drift detection on the next run.
 Run:
     docker compose run --rm spark \
         /opt/spark/bin/spark-submit --master local[*] dq_validate.py
+
+Airflow (BATCH_MINIMAL=1): one SQL scan per layer, separate Spark sessions,
+no quarantine writes — avoids OOM after gold aggregation tasks.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 
 from common import build_spark
 from dq import (
     alert,
     check_gold,
+    check_gold_minimal,
     check_silver,
+    check_silver_minimal,
     load_prior_row_count,
     quarantine_gold_violations,
     quarantine_silver_violations,
@@ -28,7 +34,29 @@ SILVER_PATH = "s3a://silver/trades"
 GOLD_PATH = "s3a://gold/ohlc"
 
 
-def main() -> None:
+def _validate_silver_minimal() -> bool:
+    spark = build_spark("dq-silver")
+    spark.sparkContext.setLogLevel("WARN")
+    prior = load_prior_row_count(spark, "silver/trades")
+    results, row_count = check_silver_minimal(spark, SILVER_PATH, prior, skip_freshness=True)
+    ok = alert(results, layer="silver")
+    save_metrics(spark, "silver/trades", row_count)
+    spark.stop()
+    return ok
+
+
+def _validate_gold_minimal() -> bool:
+    spark = build_spark("dq-gold")
+    spark.sparkContext.setLogLevel("WARN")
+    prior = load_prior_row_count(spark, "gold/ohlc")
+    results, row_count = check_gold_minimal(spark, GOLD_PATH, prior)
+    ok = alert(results, layer="gold")
+    save_metrics(spark, "gold/ohlc", row_count)
+    spark.stop()
+    return ok
+
+
+def _validate_full() -> bool:
     spark = build_spark("dq-validate")
     spark.sparkContext.setLogLevel("WARN")
 
@@ -53,8 +81,32 @@ def main() -> None:
     save_metrics(spark, "gold/ohlc", gold_count)
 
     spark.stop()
-    if not (ok_silver and ok_gold):
+    return ok_silver and ok_gold
+
+
+def main() -> None:
+    minimal = os.getenv("BATCH_MINIMAL", "").lower() in ("1", "true", "yes")
+    layer = os.getenv("DQ_LAYER", "all").lower()
+
+    if minimal:
+        ok = _validate_minimal(layer)
+    else:
+        if layer != "all":
+            raise SystemExit("DQ_LAYER requires BATCH_MINIMAL=1 (use full validate locally)")
+        ok = _validate_full()
+    if not ok:
         sys.exit(1)
+
+
+def _validate_minimal(layer: str) -> bool:
+    run_silver = layer in ("all", "silver")
+    run_gold = layer in ("all", "gold")
+    if not run_silver and not run_gold:
+        raise SystemExit(f"unknown DQ_LAYER={layer!r} (use all, silver, or gold)")
+
+    ok_silver = _validate_silver_minimal() if run_silver else True
+    ok_gold = _validate_gold_minimal() if run_gold else True
+    return ok_silver and ok_gold
 
 
 if __name__ == "__main__":

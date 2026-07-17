@@ -39,6 +39,20 @@ GOLD_MERGE_KEYS = ("product_id", "interval_start")
 INTERVAL = os.getenv("GOLD_INTERVAL", "1 minute")
 
 
+def load_silver(spark: SparkSession) -> DataFrame:
+    """Read silver, optionally scoped by GOLD_PRODUCT_ID / GOLD_SINCE_DAYS env vars."""
+    silver = spark.read.format("delta").load(SILVER_PATH)
+    product_id = os.getenv("GOLD_PRODUCT_ID")
+    since_days = os.getenv("GOLD_SINCE_DAYS")
+    if since_days:
+        silver = silver.where(
+            F.to_date("event_time") >= F.date_sub(F.current_date(), int(since_days))
+        )
+    if product_id:
+        silver = silver.where(F.col("product_id") == product_id)
+    return silver
+
+
 def to_gold(silver: DataFrame, interval: str) -> DataFrame:
     """Aggregate trades into OHLC/VWAP/volume candles, one row per product+interval."""
     # order-of-trade within the interval, for a deterministic open/close.
@@ -92,11 +106,25 @@ def write_gold(spark: SparkSession, gold: DataFrame) -> None:
 def main() -> None:
     spark = build_spark("gold-aggregate")
     spark.sparkContext.setLogLevel("WARN")
-    print(f"gold aggregate: {SILVER_PATH} -> {GOLD_PATH} (interval={INTERVAL})")
+    minimal = os.getenv("BATCH_MINIMAL", "").lower() in ("1", "true", "yes")
+    product_id = os.getenv("GOLD_PRODUCT_ID", "")
+    since_days = os.getenv("GOLD_SINCE_DAYS", "")
+    scope = []
+    if product_id:
+        scope.append(f"product={product_id}")
+    if since_days:
+        scope.append(f"since_days={since_days}")
+    scope_label = f" ({', '.join(scope)})" if scope else ""
+    print(f"gold aggregate{scope_label}: {SILVER_PATH} -> {GOLD_PATH} (interval={INTERVAL})")
 
-    silver = spark.read.format("delta").load(SILVER_PATH)
+    silver = load_silver(spark)
     gold = to_gold(silver, INTERVAL).withColumn("date", F.to_date("interval_start"))
     write_gold(spark, gold)
+
+    if minimal:
+        print("gold merge complete (BATCH_MINIMAL — DQ in dq_validate task)")
+        spark.stop()
+        return
 
     total = _count(spark, GOLD_PATH)
     print(f"gold candles written: {total}")

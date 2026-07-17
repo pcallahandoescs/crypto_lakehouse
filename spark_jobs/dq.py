@@ -162,6 +162,140 @@ def check_silver(df: DataFrame, row_count: int, prior_row_count: int | None) -> 
     return results
 
 
+def check_silver_minimal(
+    spark: SparkSession,
+    path: str,
+    prior_row_count: int | None,
+    *,
+    skip_freshness: bool = False,
+) -> tuple[list[CheckResult], int]:
+    """One-scan silver checks for Airflow (BATCH_MINIMAL — low memory)."""
+    row = spark.sql(
+        f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(DISTINCT struct(product_id, trade_id)) AS distinct_keys,
+            SUM(CASE WHEN product_id IS NULL OR trade_id IS NULL THEN 1 ELSE 0 END) AS null_keys,
+            SUM(
+                CASE WHEN price IS NULL OR size IS NULL OR event_time IS NULL THEN 1 ELSE 0 END
+            ) AS null_money,
+            SUM(CASE WHEN price <= 0 THEN 1 ELSE 0 END) AS bad_price,
+            SUM(CASE WHEN size <= 0 THEN 1 ELSE 0 END) AS bad_size,
+            SUM(CASE WHEN side NOT IN ('buy', 'sell') THEN 1 ELSE 0 END) AS bad_side,
+            MAX(event_time) AS max_event
+        FROM delta.`{path}`
+        """
+    ).collect()[0]
+    total = int(row.total)
+    distinct = int(row.distinct_keys)
+    dupes = total - distinct
+    results = [
+        CheckResult("null_keys", row.null_keys == 0, f"{row.null_keys} rows with null keys"),
+        CheckResult(
+            "null_money_or_time",
+            row.null_money == 0,
+            f"{row.null_money} rows with null price, size, or event_time",
+        ),
+        CheckResult("price_positive", row.bad_price == 0, f"{row.bad_price} rows with price <= 0"),
+        CheckResult("size_positive", row.bad_size == 0, f"{row.bad_size} rows with size <= 0"),
+        CheckResult("side_valid", row.bad_side == 0, f"{row.bad_side} rows with invalid side"),
+        CheckResult(
+            "unique_dedup_key",
+            dupes == 0,
+            f"{dupes} duplicate keys ({total} rows, {distinct} distinct)",
+        ),
+    ]
+    max_event = row.max_event
+    if skip_freshness:
+        results.append(CheckResult("freshness", True, "skipped (batch minimal)"))
+    elif max_event is None:
+        results.append(CheckResult("freshness", False, "no event_time values"))
+    else:
+        if max_event.tzinfo is None:
+            max_event = max_event.replace(tzinfo=timezone.utc)
+        age_hours = (datetime.now(tz=timezone.utc) - max_event).total_seconds() / 3600
+        results.append(
+            CheckResult(
+                "freshness",
+                age_hours <= FRESHNESS_HOURS,
+                f"latest event_time {age_hours:.1f}h ago (limit {FRESHNESS_HOURS}h)",
+            )
+        )
+    if prior_row_count is None:
+        results.append(CheckResult("row_count_drift", True, "no prior baseline"))
+    else:
+        ratio = total / prior_row_count if prior_row_count else 1.0
+        results.append(
+            CheckResult(
+                "row_count_drift",
+                ratio >= MIN_ROW_COUNT_RATIO,
+                f"{total} rows vs prior {prior_row_count} (ratio {ratio:.3f})",
+            )
+        )
+    return results, total
+
+
+def check_gold_minimal(
+    spark: SparkSession, path: str, prior_row_count: int | None
+) -> tuple[list[CheckResult], int]:
+    """One-scan gold checks for Airflow (BATCH_MINIMAL — low memory)."""
+    row = spark.sql(
+        f"""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(DISTINCT struct(product_id, interval_start)) AS distinct_keys,
+            SUM(
+                CASE WHEN product_id IS NULL OR interval_start IS NULL THEN 1 ELSE 0 END
+            ) AS null_grain,
+            SUM(
+                CASE WHEN open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL
+                THEN 1 ELSE 0 END
+            ) AS null_ohlc,
+            SUM(CASE WHEN volume < 0 THEN 1 ELSE 0 END) AS bad_volume,
+            SUM(
+                CASE WHEN high < low OR open > high OR open < low
+                          OR close > high OR close < low
+                THEN 1 ELSE 0 END
+            ) AS bad_ohlc
+        FROM delta.`{path}`
+        """
+    ).collect()[0]
+    total = int(row.total)
+    distinct = int(row.distinct_keys)
+    dupes = total - distinct
+    results = [
+        CheckResult("null_grain", row.null_grain == 0, f"{row.null_grain} rows with null grain"),
+        CheckResult(
+            "grain_unique",
+            dupes == 0,
+            f"{dupes} duplicate candles ({total} rows, {distinct} distinct)",
+        ),
+        CheckResult("null_ohlc", row.null_ohlc == 0, f"{row.null_ohlc} rows with null OHLC"),
+        CheckResult(
+            "volume_non_negative",
+            row.bad_volume == 0,
+            f"{row.bad_volume} rows with volume < 0",
+        ),
+        CheckResult(
+            "ohlc_sane",
+            row.bad_ohlc == 0,
+            f"{row.bad_ohlc} rows where OHLC violates high/low bounds",
+        ),
+    ]
+    if prior_row_count is None:
+        results.append(CheckResult("row_count_drift", True, "no prior baseline"))
+    else:
+        ratio = total / prior_row_count if prior_row_count else 1.0
+        results.append(
+            CheckResult(
+                "row_count_drift",
+                ratio >= MIN_ROW_COUNT_RATIO,
+                f"{total} rows vs prior {prior_row_count} (ratio {ratio:.3f})",
+            )
+        )
+    return results, total
+
+
 def check_gold(df: DataFrame, row_count: int, prior_row_count: int | None) -> list[CheckResult]:
     """Run gold-layer DQ checks on OHLC candles."""
     results: list[CheckResult] = []

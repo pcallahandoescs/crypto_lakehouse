@@ -152,6 +152,20 @@ curl -sf http://localhost:8088/health && echo " ok"
 Unpause and trigger `example_lakehouse` in the UI to smoke-test. See
 [`airflow.md`](./airflow.md).
 
+Build images before first DAG run:
+
+```bash
+docker compose --profile jobs build spark
+docker compose --profile orchestration build
+```
+
+**Day 19 DAGs** (unpause → trigger manually):
+
+| DAG | What it runs |
+|---|---|
+| `batch_lakehouse` | gold_aggregate_btc + gold_aggregate_eth → dq_validate (nightly 03:00 UTC) |
+| `backfill_lakehouse` | Parameterized backfill — trigger with `{"start_date":"2026-07-05","end_date":"2026-07-08"}` |
+
 ## 10. Useful debug commands
 
 ```bash
