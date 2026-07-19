@@ -69,7 +69,7 @@ curl -sf http://localhost:8088/health && echo " ok"
 
 | DAG | Schedule | Tasks | Purpose |
 |---|---|---|---|
-| **`batch_lakehouse`** | `0 3 * * *` (03:00 UTC daily) | gold_aggregate_btc + gold_aggregate_eth → dq_validate | One product per Spark container (Docker memory) |
+| **`batch_lakehouse`** | `0 3 * * *` (03:00 UTC daily) | gold_aggregate_btc → gold_aggregate_eth → dq_validate_silver → dq_validate_gold | One product/layer per Spark container (Docker memory) |
 | **`backfill_lakehouse`** | Manual only | backfill_silver → backfill_gold | Parameterized date-range replay (includes silver MERGE) |
 | `example_lakehouse` | Manual | hello task | Day 18 smoke test |
 
@@ -79,7 +79,10 @@ manually.
 ### Run the batch DAG manually
 
 1. UI → **batch_lakehouse** → Unpause → **Trigger DAG**
-2. Graph: `gold_aggregate_btc` → `gold_aggregate_eth` → `dq_validate` (sequential — not parallel; avoids OOM)
+2. Graph: `gold_aggregate_btc` → `gold_aggregate_eth` → `dq_validate_silver` → `dq_validate_gold` (sequential — not parallel; avoids OOM)
+
+On failure, each task fires `on_failure_callback` (structured `ALERT` log; set
+`SLACK_WEBHOOK_URL` to push to Slack). See [`observability.md`](./observability.md).
 3. Task logs show `docker run ... spark-submit` output
 
 **Note:** `silver_batch.py` is intentionally **not** in this DAG — a full bronze→silver

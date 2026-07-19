@@ -25,12 +25,16 @@ Run:
 from __future__ import annotations
 
 import os
+import time
 
 from common import build_spark
 from dq import alert, check_gold, load_prior_row_count, save_metrics
 from idempotent import merge_condition, merge_upsert
+from observe import JobLogger, record_run
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+log = JobLogger("gold-aggregate")
 
 SILVER_PATH = "s3a://silver/trades"
 GOLD_PATH = "s3a://gold/ohlc"
@@ -109,25 +113,40 @@ def main() -> None:
     minimal = os.getenv("BATCH_MINIMAL", "").lower() in ("1", "true", "yes")
     product_id = os.getenv("GOLD_PRODUCT_ID", "")
     since_days = os.getenv("GOLD_SINCE_DAYS", "")
-    scope = []
-    if product_id:
-        scope.append(f"product={product_id}")
-    if since_days:
-        scope.append(f"since_days={since_days}")
-    scope_label = f" ({', '.join(scope)})" if scope else ""
-    print(f"gold aggregate{scope_label}: {SILVER_PATH} -> {GOLD_PATH} (interval={INTERVAL})")
+    start = time.monotonic()
+    log.event(
+        "started",
+        source=SILVER_PATH,
+        sink=GOLD_PATH,
+        interval=INTERVAL,
+        product_id=product_id or None,
+        since_days=since_days or None,
+        minimal=minimal,
+    )
 
     silver = load_silver(spark)
     gold = to_gold(silver, INTERVAL).withColumn("date", F.to_date("interval_start"))
     write_gold(spark, gold)
 
     if minimal:
-        print("gold merge complete (BATCH_MINIMAL — DQ in dq_validate task)")
+        # Minimal mode is memory-tight (Airflow / Docker Desktop). Emit a cheap
+        # structured log only — no extra Delta write here (that would risk OOM
+        # right after the MERGE). Volume/quality metrics are recorded by the
+        # downstream dq_validate task instead.
+        log.event("merge_complete", duration_seconds=round(time.monotonic() - start, 2))
         spark.stop()
         return
 
     total = _count(spark, GOLD_PATH)
-    print(f"gold candles written: {total}")
+    log.event("candles_written", rows=total, duration_seconds=round(time.monotonic() - start, 2))
+    record_run(
+        spark,
+        job="gold-aggregate",
+        layer="gold",
+        event="candles_written",
+        rows=total,
+        duration_seconds=round(time.monotonic() - start, 2),
+    )
 
     prior = load_prior_row_count(spark, "gold/ohlc")
     gold_df = spark.read.format("delta").load(GOLD_PATH)

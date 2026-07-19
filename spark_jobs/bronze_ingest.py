@@ -21,10 +21,13 @@ from __future__ import annotations
 import os
 
 from common import build_spark
+from observe import JobLogger, stream_progress_fields
 from pyspark.sql.functions import current_timestamp
 
 BRONZE_PATH = "s3a://bronze/trades"
 CHECKPOINT_PATH = "s3a://bronze/_checkpoints/trades"
+
+log = JobLogger("bronze-ingest")
 
 
 def main() -> None:
@@ -33,7 +36,7 @@ def main() -> None:
 
     spark = build_spark("bronze-ingest")
     spark.sparkContext.setLogLevel("WARN")
-    print(f"bronze ingest: {bootstrap}/{topic} -> {BRONZE_PATH}")
+    log.event("started", source=f"{bootstrap}/{topic}", sink=BRONZE_PATH)
 
     # Read the topic as a stream. startingOffsets=earliest only applies on the
     # first run (no checkpoint yet); afterwards the checkpoint decides where to
@@ -67,9 +70,9 @@ def main() -> None:
         .start(BRONZE_PATH)
     )
 
-    # Print per-batch progress so the ingestion is visible; Ctrl+C to stop.
-    # Only print when the batch id changes (during a backlog many batches run
-    # between 10s samples; repeated idle ticks are noise).
+    # Log per-batch progress (rows, rate, Kafka lag) so ingestion is observable;
+    # Ctrl+C to stop. Only log when the batch id changes (during a backlog many
+    # batches run between 10s samples; repeated idle ticks are noise).
     last_batch = -1
     try:
         while query.isActive:
@@ -77,13 +80,9 @@ def main() -> None:
             progress = query.lastProgress
             if progress is not None and progress["batchId"] != last_batch:
                 last_batch = progress["batchId"]
-                print(
-                    f"[progress] batch={progress['batchId']} "
-                    f"inputRows={progress['numInputRows']} "
-                    f"rows/s={progress.get('inputRowsPerSecond')}"
-                )
+                log.event("batch", **stream_progress_fields(progress))
     except KeyboardInterrupt:
-        print("stopping stream...")
+        log.event("stopping")
         query.stop()
 
     spark.stop()

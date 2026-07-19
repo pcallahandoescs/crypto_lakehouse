@@ -31,6 +31,8 @@ reasoning durable. See [ADR 0001](./0001-record-architecture-decisions.md).
 | [0009](./0009-partitioning-strategy.md) | Gold-table partitioning strategy | Accepted |
 | [0010](./0010-zorder-vs-liquid-clustering.md) | Z-ordering vs. liquid clustering | Accepted |
 | [0011](./0011-minio-image-chainguard.md) | MinIO container image: Chainguard | Accepted |
+| [0012](./0012-orchestration-airflow.md) | Orchestration with Apache Airflow | Accepted |
+| [0013](./0013-observability-approach.md) | Observability: structured logs + Delta metrics table | Accepted |
 
 ## Template
 

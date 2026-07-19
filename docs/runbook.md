@@ -163,8 +163,22 @@ docker compose --profile orchestration build
 
 | DAG | What it runs |
 |---|---|
-| `batch_lakehouse` | gold_aggregate_btc + gold_aggregate_eth → dq_validate (nightly 03:00 UTC) |
+| `batch_lakehouse` | gold_aggregate_btc → gold_aggregate_eth → dq_validate_silver → dq_validate_gold (nightly 03:00 UTC) |
 | `backfill_lakehouse` | Parameterized backfill — trigger with `{"start_date":"2026-07-05","end_date":"2026-07-08"}` |
+
+## 9a. Observability (Day 20)
+
+Structured JSON logs on every job + a Delta run-metrics table
+(`s3a://gold/_observability/runs`). See [`observability.md`](./observability.md).
+
+```bash
+# Health at a glance: rows, DQ pass/fail, freshness per layer
+docker compose run --rm spark \
+  /opt/spark/bin/spark-submit --master "local[*]" metrics_report.py
+```
+
+Task failures fire an Airflow `on_failure_callback` (structured `ALERT` log; set
+`SLACK_WEBHOOK_URL` to also push to Slack).
 
 ## 10. Useful debug commands
 

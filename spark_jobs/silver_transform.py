@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from common import TRADE_SCHEMA, build_spark
 from dq import SILVER_QUARANTINE_PATH
+from observe import JobLogger, stream_progress_fields
 from pyspark.sql import Column, DataFrame
 from pyspark.sql.functions import col, current_timestamp, from_json, lit
 
@@ -30,6 +31,8 @@ BRONZE_PATH = "s3a://bronze/trades"
 SILVER_PATH = "s3a://silver/trades"
 CHECKPOINT_PATH = "s3a://silver/_checkpoints/trades"
 QUARANTINE_CHECKPOINT_PATH = "s3a://silver/_checkpoints/quarantine"
+
+log = JobLogger("silver-transform")
 
 
 def _is_valid_trade() -> Column:
@@ -89,8 +92,12 @@ def to_quarantine(parsed: DataFrame) -> DataFrame:
 def main() -> None:
     spark = build_spark("silver-transform")
     spark.sparkContext.setLogLevel("WARN")
-    print(f"silver transform: {BRONZE_PATH} -> {SILVER_PATH}")
-    print(f"  quarantine: {SILVER_QUARANTINE_PATH}")
+    log.event(
+        "started",
+        source=BRONZE_PATH,
+        sink=SILVER_PATH,
+        quarantine=SILVER_QUARANTINE_PATH,
+    )
 
     bronze = spark.readStream.format("delta").option("maxFilesPerTrigger", "64").load(BRONZE_PATH)
     parsed = parse_bronze(bronze)
@@ -120,13 +127,9 @@ def main() -> None:
             progress = silver_query.lastProgress
             if progress is not None and progress["batchId"] != last_batch:
                 last_batch = progress["batchId"]
-                print(
-                    f"[progress] batch={progress['batchId']} "
-                    f"inputRows={progress['numInputRows']} "
-                    f"rows/s={progress.get('inputRowsPerSecond')}"
-                )
+                log.event("batch", **stream_progress_fields(progress))
     except KeyboardInterrupt:
-        print("stopping stream...")
+        log.event("stopping")
         silver_query.stop()
         quarantine_query.stop()
 

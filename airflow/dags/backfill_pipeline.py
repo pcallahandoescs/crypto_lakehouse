@@ -14,12 +14,14 @@ from datetime import datetime, timedelta
 from airflow.decorators import dag
 from airflow.models.param import Param
 from airflow.operators.bash import BashOperator
+from lakehouse.alerts import alert_on_failure
 from lakehouse.spark_compose import spark_bash_command
 
 DEFAULT_ARGS = {
     "owner": "lakehouse",
     "retries": 1,
     "retry_delay": timedelta(minutes=10),
+    "on_failure_callback": alert_on_failure,
 }
 
 

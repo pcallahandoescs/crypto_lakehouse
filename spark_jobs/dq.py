@@ -168,8 +168,13 @@ def check_silver_minimal(
     prior_row_count: int | None,
     *,
     skip_freshness: bool = False,
-) -> tuple[list[CheckResult], int]:
-    """One-scan silver checks for Airflow (BATCH_MINIMAL — low memory)."""
+) -> tuple[list[CheckResult], int, float | None]:
+    """One-scan silver checks for Airflow (BATCH_MINIMAL — low memory).
+
+    Returns (check results, row count, freshness in seconds). Freshness is the
+    age of the newest event_time and is computed even when the freshness *check*
+    is skipped, so it can still be recorded as an observability metric.
+    """
     row = spark.sql(
         f"""
         SELECT
@@ -206,14 +211,17 @@ def check_silver_minimal(
         ),
     ]
     max_event = row.max_event
-    if skip_freshness:
-        results.append(CheckResult("freshness", True, "skipped (batch minimal)"))
-    elif max_event is None:
-        results.append(CheckResult("freshness", False, "no event_time values"))
-    else:
+    freshness_seconds: float | None = None
+    if max_event is not None:
         if max_event.tzinfo is None:
             max_event = max_event.replace(tzinfo=timezone.utc)
-        age_hours = (datetime.now(tz=timezone.utc) - max_event).total_seconds() / 3600
+        freshness_seconds = (datetime.now(tz=timezone.utc) - max_event).total_seconds()
+    if skip_freshness:
+        results.append(CheckResult("freshness", True, "skipped (batch minimal)"))
+    elif freshness_seconds is None:
+        results.append(CheckResult("freshness", False, "no event_time values"))
+    else:
+        age_hours = freshness_seconds / 3600
         results.append(
             CheckResult(
                 "freshness",
@@ -232,7 +240,7 @@ def check_silver_minimal(
                 f"{total} rows vs prior {prior_row_count} (ratio {ratio:.3f})",
             )
         )
-    return results, total
+    return results, total, freshness_seconds
 
 
 def check_gold_minimal(

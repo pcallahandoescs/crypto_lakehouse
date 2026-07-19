@@ -25,6 +25,9 @@ import contextlib
 import json
 import logging
 import signal
+import sys
+import time
+from datetime import UTC, datetime
 from typing import Any
 
 from confluent_kafka import Producer
@@ -36,6 +39,31 @@ from producer.config import Settings, load_settings
 logger = logging.getLogger("producer")
 
 TRADE_TYPES = ("match", "last_match")
+
+# How often (in messages) to emit a throughput metric.
+THROUGHPUT_EVERY = 100
+
+
+class _JsonFormatter(logging.Formatter):
+    """One JSON object per log line (job, event, level, ts, + extra fields)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, Any] = {
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+            "level": record.levelname,
+            "job": "producer",
+            "event": record.getMessage(),
+        }
+        fields = getattr(record, "fields", None)
+        if fields:
+            payload.update(fields)
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
+
+
+def _log(event: str, level: int = logging.INFO, **fields: Any) -> None:
+    logger.log(level, event, extra={"fields": fields})
 
 
 def build_producer(settings: Settings) -> Producer:
@@ -59,7 +87,7 @@ def build_producer(settings: Settings) -> Producer:
 def _on_delivery(err: Any, msg: Any) -> None:
     """Delivery callback: log only failures (success is the common case)."""
     if err is not None:
-        logger.error("delivery failed (key=%s): %s", msg.key(), err)
+        _log("delivery_failed", level=logging.ERROR, key=str(msg.key()), error=str(err))
 
 
 def _subscribe_message(settings: Settings) -> str:
@@ -83,20 +111,21 @@ async def run() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
 
-    logger.info(
-        "starting: ws=%s topic=%s bootstrap=%s products=%s",
-        settings.ws_url,
-        settings.topic,
-        settings.kafka_bootstrap,
-        ",".join(settings.products),
+    _log(
+        "starting",
+        ws=settings.ws_url,
+        topic=settings.topic,
+        bootstrap=settings.kafka_bootstrap,
+        products=list(settings.products),
     )
 
     published = 0
+    window_start = time.monotonic()
     # This async-for reconnects automatically when the connection drops.
     async for ws in connect(settings.ws_url, ping_interval=20, ping_timeout=20):
         try:
             await ws.send(subscribe)
-            logger.info("subscribed to matches for %s", ", ".join(settings.products))
+            _log("subscribed", channel="matches", products=list(settings.products))
 
             async for raw in ws:
                 if stop.is_set():
@@ -131,25 +160,32 @@ async def run() -> None:
                 # Serve delivery callbacks without blocking.
                 producer.poll(0)
                 published += 1
-                if published % 100 == 0:
-                    logger.info("published %d trades", published)
+                if published % THROUGHPUT_EVERY == 0:
+                    now = time.monotonic()
+                    elapsed = now - window_start
+                    rate = THROUGHPUT_EVERY / elapsed if elapsed > 0 else None
+                    _log(
+                        "throughput",
+                        published=published,
+                        trades_per_sec=round(rate, 2) if rate is not None else None,
+                    )
+                    window_start = now
 
             if stop.is_set():
                 break
         except ConnectionClosed:
-            logger.warning("websocket closed; reconnecting...")
+            _log("websocket_closed", level=logging.WARNING)
             continue
         finally:
             producer.flush(5)
 
-    logger.info("stopped after publishing %d trades", published)
+    _log("stopped", published=published)
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(_JsonFormatter())
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
     # SIGINT is handled inside run(); this is a belt-and-suspenders fallback.
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(run())

@@ -26,6 +26,8 @@ _local/
 # Personal learning + interview-prep decisions log (the ADRs in docs/adr/ are the
 # public record; this one stays private).
 design_decisions.md
+# Local AI agent working agreement — kept private, not part of the public repo.
+AGENTS.md
 
 # ---- Secrets / local env ----
 .env

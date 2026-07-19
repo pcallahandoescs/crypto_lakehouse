@@ -27,11 +27,14 @@ from __future__ import annotations
 import os
 
 from common import TRADE_SCHEMA, build_spark
+from observe import JobLogger, stream_progress_fields
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 REALTIME_PATH = "s3a://gold/realtime_metrics"
 CHECKPOINT_PATH = "s3a://gold/_checkpoints/realtime_metrics"
+
+log = JobLogger("speed-metrics")
 
 WINDOW = "1 minute"  # length of each rolling window
 SLIDE = "15 seconds"  # how often a new window starts (sliding => overlapping)
@@ -74,7 +77,7 @@ def main() -> None:
 
     spark = build_spark("speed-metrics")
     spark.sparkContext.setLogLevel("WARN")
-    print(f"speed layer: {bootstrap}/{topic} -> {REALTIME_PATH}")
+    log.event("started", source=f"{bootstrap}/{topic}", sink=REALTIME_PATH)
 
     # startingOffsets=latest: the speed layer cares about NOW, not history, so it
     # only processes trades that arrive after it starts (the batch path owns the
@@ -126,13 +129,9 @@ def main() -> None:
             progress = query.lastProgress
             if progress is not None and progress["batchId"] != last_batch:
                 last_batch = progress["batchId"]
-                print(
-                    f"[progress] batch={progress['batchId']} "
-                    f"inputRows={progress['numInputRows']} "
-                    f"rows/s={progress.get('inputRowsPerSecond')}"
-                )
+                log.event("batch", **stream_progress_fields(progress))
     except KeyboardInterrupt:
-        print("stopping stream...")
+        log.event("stopping")
         query.stop()
 
     spark.stop()
