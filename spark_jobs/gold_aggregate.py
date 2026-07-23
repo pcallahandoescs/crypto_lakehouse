@@ -1,4 +1,4 @@
-"""Day 12/16: silver -> gold (OHLC candles + VWAP + volume).
+"""Silver -> gold (OHLC candles + VWAP + volume).
 
 Gold is the analytical product: the thing consumers (a dashboard, an analyst, a
 model) actually query. We roll individual trades up into **candles** -- one row
@@ -15,7 +15,7 @@ default.
 
 Batch job: read all of silver, recompute candles, **MERGE upsert** into gold on
 (product_id, interval_start). Safe to re-run — matched rows update in place,
-no duplicates (Day 16).
+no duplicates.
 
 Run:
     docker compose run --rm spark \

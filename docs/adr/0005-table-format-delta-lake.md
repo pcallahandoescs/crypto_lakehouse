@@ -25,7 +25,7 @@ layout toolkit and (version-permitting) liquid clustering.
   commits enabling **exactly-once** streaming into bronze, and time travel for
   audit/debugging.
 - Schema enforcement stops bad writes at the table boundary; evolution provides a
-  controlled path for additive change (proven with a drift test on Day 21).
+  controlled path for additive change (proven with a schema-drift test).
 - Ties us to the Delta ecosystem (best-in-class with Spark, which we already
   use); interop is improving but historically Delta-centric.
 

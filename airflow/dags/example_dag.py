@@ -1,7 +1,7 @@
-"""Day 18 smoke DAG — proves the scheduler picks up code from airflow/dags/.
+"""Smoke DAG — proves the scheduler picks up code from airflow/dags/.
 
-Real batch + backfill DAGs land in Day 19. Paused at creation by default
-(AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION).
+The real batch + backfill DAGs live alongside this one. Paused at creation by
+default (AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION).
 """
 
 from __future__ import annotations

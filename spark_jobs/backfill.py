@@ -1,7 +1,7 @@
-"""Day 17: backfill bronze -> silver -> gold for an event-time date range.
+"""Backfill bronze -> silver -> gold for an event-time date range.
 
 Reprocesses history on demand by reading **immutable bronze** (the replay log),
-conforming trades, and MERGE-upserting into silver and gold (Day 16). Safe to
+conforming trades, and MERGE-upserting into silver and gold. Safe to
 re-run the same range — matched keys update in place, no duplicates.
 
 Event-time bounds: [--start, --end) as UTC dates (end exclusive).

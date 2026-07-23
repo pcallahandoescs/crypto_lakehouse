@@ -1,13 +1,16 @@
 # Real-Time Crypto Market Data Lakehouse
 
+[![CI](https://github.com/pcallahandoescs/crypto_lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/pcallahandoescs/crypto_lakehouse/actions/workflows/ci.yml)
+
 > A production-grade, end-to-end data platform: live crypto trades streamed from the
 > Coinbase WebSocket, buffered through Kafka, processed by Spark into a Delta Lake
 > medallion architecture on MinIO, orchestrated with Airflow, served via FastAPI +
 > a live dashboard, and deployed on Kubernetes.
 
-**Status:** Building in public — **Week 2 complete (Day 14 — full Lambda pipeline
-end-to-end in Compose)**. Live trades flow Kafka → bronze → silver → gold, plus a
-real-time speed layer. See the [runbook](./docs/runbook.md) to reproduce the stack.
+**Status:** Live trades flow Kafka → bronze → silver → gold, plus a real-time
+speed layer — orchestrated with Airflow, covered by data-quality checks, and
+observable via structured logs + a run-metrics table. See the
+[runbook](./docs/runbook.md) to reproduce the stack.
 
 Full design and the reasoning behind every choice:
 [`ARCHITECTURE.md`](./ARCHITECTURE.md) · decisions log [`docs/adr/`](./docs/adr/) ·
@@ -47,9 +50,9 @@ flowchart TD
     AIRFLOW["Airflow<br/>(orchestrates batch + backfills)"] -.-> BATCH
 ```
 
-> This diagram is the target design; components come online across Weeks 1–4.
-> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the Lambda
-> rationale, and current build status.
+> This diagram is the target design; the serving and Kubernetes layers are still
+> in progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the
+> Lambda rationale, and current build status.
 
 ## Tech stack
 
@@ -90,17 +93,26 @@ Requires [uv](https://docs.astral.sh/uv/) and Docker.
 ```bash
 make install      # sync the virtualenv from pyproject + uv.lock
 make check        # lint + format-check + typecheck + tests (the CI gate)
+make test-spark   # JVM-backed Spark transformation/DQ tests (needs Java 17)
 make hooks        # install pre-commit git hooks
 ```
 
 Quality tooling: **ruff** (lint + format), **mypy** (strict typing), **pytest**.
 
+Tests come in two tiers. The **fast gate** (`make check`, run on every push by
+CI) covers pure-Python logic — the ingestion data contract and its schema-drift
+behavior, the producer's ingest filter and structured logging, and the streaming
+lag/latency math — with no JVM. The **Spark tier** (`make test-spark`) runs the
+real bronze→silver transformation and the data-quality checks on a local
+`SparkSession`; it's auto-skipped when PySpark isn't installed, so it never slows
+the gate.
+
 ## Roadmap
 
-- **Week 1** — Foundations & ingestion: live data flowing into Kafka, containerized.
-- **Week 2** — Lakehouse & processing: full Lambda pipeline end-to-end in Compose. **Done.**
-- **Week 3** — Production rigor: data quality, idempotency, replay, orchestration, tests.
-- **Week 4** — Serving & deployment: FastAPI + dashboard, Kubernetes + Helm, docs.
+- **Foundations & ingestion** — live data flowing into Kafka, containerized. **Done.**
+- **Lakehouse & processing** — full Lambda pipeline end-to-end in Compose. **Done.**
+- **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **In progress.**
+- **Serving & deployment** — FastAPI + dashboard, Kubernetes + Helm, docs. **Planned.**
 
 ## License
 

@@ -31,7 +31,7 @@ from consumer.schema import Trade
 
 logger = logging.getLogger("verify")
 
-_PARTITIONS = 6  # matches the topic's partition count (Day 3)
+_PARTITIONS = 6  # matches the topic's partition count
 
 
 class Stats:

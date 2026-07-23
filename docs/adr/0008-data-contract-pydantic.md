@@ -8,7 +8,7 @@
 Kafka is schema-agnostic — a topic is just bytes, and malformed or drifted
 messages will flow downstream and silently corrupt aggregates if nothing checks
 them (we literally have two hand-produced junk messages sitting in the topic
-from Day 3 testing). We need a formal, enforced definition of a valid trade at
+from earlier testing). We need a formal, enforced definition of a valid trade at
 the point data enters the system, expressing types, nullability, and invariants
 a bare JSON blob cannot.
 

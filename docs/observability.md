@@ -1,8 +1,8 @@
-# Observability (Day 20)
+# Observability
 
 Building a pipeline is one thing; **knowing whether it's healthy** is another.
-Day 20 adds the DataOps layer: structured logs, a queryable metrics store,
-streaming lag/latency, and failure alerting — mapped to the five pillars of data
+The DataOps layer adds structured logs, a queryable metrics store, streaming
+lag/latency, and failure alerting — mapped to the five pillars of data
 observability.
 
 ## The five pillars (and where each lives)
@@ -11,7 +11,7 @@ observability.
 |---|---|---|
 | **Freshness** | How recent is the data? | `dq_validate` records `freshness_seconds` (age of newest `event_time`) to the run-metrics table; `metrics_report.py` prints it |
 | **Volume** | Did we get the expected number of rows? | `rows` per layer in the run-metrics table + `row_count_drift` DQ check (ratio vs. prior run) |
-| **Schema** | Did the shape change? | Delta **schema enforcement** (writes rejected on drift) + the Pydantic contract at ingestion; drift test on Day 21 |
+| **Schema** | Did the shape change? | Delta **schema enforcement** (writes rejected on drift) + the Pydantic contract at ingestion; exercised by a schema-drift test |
 | **Lineage** | Where did this data come from? | Medallion layering (bronze → silver → gold) with provenance columns (Kafka topic/partition/offset, `ingest_timestamp`, `silver_timestamp`); see below |
 | **Quality** | Is the data correct? | DQ checks (`dq.py`) → `dq_passed` / `dq_failed` counts in the run-metrics table; quarantine tables for bad rows |
 
@@ -36,7 +36,7 @@ Spark's own log4j output stays at `WARN`; these are the *application* events
 `event`, `rows`, `dq_passed`, `dq_failed`, `duration_seconds`,
 `freshness_seconds`, `ts`. This table **doubles as the drift baseline**
 (`observe.load_prior_rows`) so there is a single metrics write per task — a
-second Delta write OOMs the memory-tight Airflow tasks (see Day 19).
+second Delta write OOMs the memory-tight Airflow tasks.
 
 Read it at a glance:
 
@@ -53,8 +53,8 @@ dq-validate      silver     165,807       8/8    291.0h  2026-07-19 03:11
   all latest DQ checks passing
 ```
 
-(The FastAPI `/metrics` and `/health` endpoints on Day 22 will serve this same
-table over HTTP — the store is built now so serving is a thin read later.)
+(The serving layer's `/metrics` and `/health` endpoints read this same table, so
+the store is built here and serving stays a thin read.)
 
 ## Streaming lag & latency
 
@@ -100,8 +100,8 @@ Unity Catalog) — noted as the scale-up path, not built here.
 
 ## What this is not
 
-- **No Prometheus/Grafana stack** — for a single-node portfolio pipeline the
-  Delta run-metrics table + structured logs give the same signal without another
+- **No Prometheus/Grafana stack** — for a single-node pipeline the Delta
+  run-metrics table + structured logs give the same signal without another
   service to run. The scale-up path (metrics exporter → Prometheus → Grafana,
-  logs → Loki) is documented, not built (honesty rule).
+  logs → Loki) is documented, not built.
 - **No distributed tracing** — one JVM per job; spans would be noise here.

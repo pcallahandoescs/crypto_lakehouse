@@ -1,4 +1,4 @@
-# Spark + Delta + MinIO (Day 9)
+# Spark + Delta + MinIO
 
 The trickiest integration in the project, validated **in isolation** with a
 hello-world before real jobs run on it. Proves the engine (Spark), the table
@@ -84,6 +84,6 @@ to see the Parquet files and the `_delta_log/` directory on disk.
 ## Why "prove it in isolation" first
 
 Spark ↔ S3A ↔ Delta is the single most failure-prone wiring in the stack. Getting
-a hello-world green *before* building the streaming bronze job (Day 10) means that
+a hello-world green *before* building the streaming bronze job means that
 when something breaks later, we know it's our *logic*, not the plumbing. This is
 the same reason we stood up Kafka before the producer.

@@ -1,7 +1,7 @@
-# Idempotency & replay safety (Day 16)
+# Idempotency & replay safety
 
 Batch jobs must be **safe to re-run**: a retry after a crash, a scheduled
-recompute, or a backfill (Day 17) must not duplicate rows or leave the table in
+recompute, or a backfill must not duplicate rows or leave the table in
 a worse state. This project uses **Delta MERGE** (upsert) keyed on deterministic
 grain columns.
 
@@ -32,8 +32,8 @@ This differs from:
 | **Full overwrite** | Yes | Rewrites entire table every run — wasteful at scale, brief empty window |
 | **MERGE on grain key** | Yes | Incremental, keyed, production pattern |
 
-Streaming layers use **checkpoints + exactly-once sinks** (Day 10). Batch layers
-use **MERGE** (Day 16). Same goal — no duplicates — different tool.
+Streaming layers use **checkpoints + exactly-once sinks**. Batch layers use
+**MERGE**. Same goal — no duplicates — different tool.
 
 ## Where it's wired
 
@@ -41,7 +41,7 @@ use **MERGE** (Day 16). Same goal — no duplicates — different tool.
 |---|---|---|
 | **Gold** (`gold_aggregate.py`) | `(product_id, interval_start)` | MERGE + `date` partition |
 | **Silver batch** (`silver_batch.py`) | `(product_id, trade_id)` | MERGE (no partition) |
-| **Silver stream** (`silver_transform.py`) | watermark dedup | streaming idempotency (Day 11) |
+| **Silver stream** (`silver_transform.py`) | watermark dedup | streaming idempotency |
 
 Gold no longer uses `mode("overwrite")` — it upserts in place.
 
@@ -86,7 +86,7 @@ docker compose run --rm spark \
     /opt/spark/bin/spark-submit --master "local[*]" counts.py
 ```
 
-## Delivery semantics map (interview cheat sheet)
+## Delivery semantics map
 
 | Stage | Semantics | Mechanism |
 |---|---|---|

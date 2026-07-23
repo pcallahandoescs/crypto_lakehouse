@@ -21,7 +21,7 @@ Kafka, writes Delta on MinIO via S3A, and provides the `OPTIMIZE`/`ZORDER`/
 - One engine, two paradigms (stream + batch) with a largely shared API —
   smaller surface area to learn and operate; directly relevant day-to-day skill.
 - First-class Delta + S3A integration; the trickiest wiring (Spark ↔ S3A ↔
-  Delta) is validated in isolation on Day 9 before real jobs run on it.
+  Delta) is validated in isolation before real jobs run on it.
 - Heavier runtime (JVM, cluster semantics) than lightweight alternatives; fine
   for a realistic, scalable design and a single-node local cluster.
 

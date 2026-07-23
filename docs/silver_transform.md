@@ -1,4 +1,4 @@
-# Silver transform (Day 11): clean, type & conform
+# Silver transform: clean, type & conform
 
 Second pipeline stage. [`spark_jobs/silver_transform.py`](../spark_jobs/silver_transform.py)
 reads the **bronze** table (raw JSON strings) and produces **silver** at
@@ -36,9 +36,9 @@ can't parse becomes **null**:
 
 We then keep only rows where the identity + money + time fields are non-null
 (`trade_id`, `product_id`, `price`, `size`, `time`). That single filter rejects
-both junk messages we planted on Day 3, which is the "drop malformed rows" step.
-(A stricter design quarantines rejects into a side table — implemented on
-**Day 15**; see [`data_quality.md`](./data_quality.md).)
+both junk messages we planted earlier, which is the "drop malformed rows" step.
+(A stricter design quarantines rejects into a side table — see the
+[data-quality checks](./data_quality.md).)
 
 ## Deduplication + watermark (the idempotency seed)
 
@@ -60,7 +60,7 @@ conformed.withWatermark("event_time", "1 hour") \
   `dropDuplicates` required exact event-time match too, which is fragile).
 
 This is the project's first taste of **idempotency**: re-delivered or replayed
-trades collapse to one row. Day 16 generalizes it to batch `MERGE`/upsert.
+trades collapse to one row. The batch layer generalizes it to `MERGE`/upsert.
 
 The 1-hour watermark is a deliberate trade-off: it tolerates duplicates arriving
 up to an hour apart, at the cost of an hour of retained state. A duplicate that
@@ -82,7 +82,7 @@ the table schema on write. Policy for this project:
 - **Evolve deliberately** only for known, additive, backward-compatible changes,
   as an explicit code change — never as an accident.
 
-We prove the evolution path with a deliberate schema-drift test on **Day 21**.
+We prove the evolution path with a deliberate schema-drift test.
 
 ## Run it
 

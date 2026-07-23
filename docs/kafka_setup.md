@@ -1,4 +1,4 @@
-# Kafka Setup (Day 3): single-broker KRaft in Docker
+# Kafka Setup: single-broker KRaft in Docker
 
 The ingestion backbone. A single Apache Kafka broker running in **KRaft mode**,
 defined in [`docker-compose.yml`](../docker-compose.yml).
@@ -50,10 +50,10 @@ Created via [`scripts/create_topics.sh`](../scripts/create_topics.sh):
 ### Why 6 partitions
 
 Partitions are Kafka's unit of parallelism and ordering. The decision is a
-tradeoff, informed by the Day 2 findings (see
+tradeoff, informed by the feed study (see
 [`coinbase_websocket_schema.md`](./coinbase_websocket_schema.md)):
 
-- On Day 4 we **key messages by `product_id`** so each market's trades stay
+- We **key messages by `product_id`** so each market's trades stay
   ordered. Kafka routes by `hash(key) % partitions`, so a product always lands
   in the same partition. With only **2 products today (BTC, ETH)**, at most 2
   partitions will hold data — the rest sit idle (our observed **skew**).

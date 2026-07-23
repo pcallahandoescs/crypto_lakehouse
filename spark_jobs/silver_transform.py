@@ -1,7 +1,7 @@
-"""Day 11: bronze -> silver (parse, type, conform, deduplicate).
+"""Bronze -> silver (parse, type, conform, deduplicate).
 
 Bronze is the raw JSON string as it arrived. Silver is the *trustworthy* table:
-each trade parsed into real typed columns, malformed rows quarantined (Day 15),
+each trade parsed into real typed columns, malformed rows quarantined,
 and duplicates removed on the natural key (product_id, trade_id). This is the
 first layer other people/jobs are meant to actually query.
 

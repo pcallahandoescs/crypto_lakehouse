@@ -1,4 +1,4 @@
-# Speed layer (Day 13): real-time windowed metrics
+# Speed layer: real-time windowed metrics
 
 The streaming half of the **Lambda architecture**.
 [`spark_jobs/speed_metrics.py`](../spark_jobs/speed_metrics.py) reads Kafka
@@ -63,7 +63,7 @@ final** — i.e. after the watermark passes its end and no more data can change 
 This is the durable, exactly-once-friendly choice for a Delta sink. The cost:
 a window appears ~1 watermark after it closes. A lower-latency design would use
 `foreachBatch` + Delta `MERGE` to upsert *in-progress* windows (update semantics),
-which overlaps the idempotency work on Day 16.
+which overlaps the batch idempotency work.
 
 ## Run it
 

@@ -1,4 +1,4 @@
-"""Day 19: scheduled batch pipeline — gold → DQ.
+"""Scheduled batch pipeline — gold → DQ.
 
 Silver is kept current by the **streaming** silver_transform job (Lambda speed/batch
 split). Gold runs **one product per Spark container**, **sequentially** — parallel runs OOM

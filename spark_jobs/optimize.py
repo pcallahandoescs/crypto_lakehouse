@@ -1,4 +1,4 @@
-"""Day 14: measure the data-layout toolkit -- compaction, Z-order, VACUUM.
+"""Measure the data-layout toolkit -- compaction, Z-order, VACUUM.
 
 Makes the "small files problem" and data skipping concrete by reporting
 before/after numbers on a Delta table:

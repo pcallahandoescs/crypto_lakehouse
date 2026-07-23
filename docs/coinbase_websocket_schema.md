@@ -2,7 +2,7 @@
 
 Documentation of the source feed, captured on **2026-07-01** by
 [`producer/explore_feed.py`](../producer/explore_feed.py). This grounds the formal
-schema / data contract (Day 6) and downstream design in the *real* feed, not
+schema / data contract and downstream design in the *real* feed, not
 assumptions.
 
 ## Connection
@@ -96,7 +96,7 @@ JSON has no decimal type — only `number`, which is a binary float where
 accumulate and can even make the batch and speed layers disagree. Coinbase sends
 `"60383.65"` as a **string** to preserve exact digits. Parse to an exact type —
 Python `Decimal` or Spark `DecimalType(precision, scale)` — **never `float`/
-`double`** (Day 11).
+`double`**.
 
 ### 2. `side` is the MAKER's side, not the aggressor's
 `side` reports the side of the *resting* (maker) order, so the **aggressor
@@ -110,16 +110,16 @@ Python `Decimal` or Spark `DecimalType(precision, scale)` — **never `float`/
 **Why it matters:** order-flow / "buy vs sell pressure" metrics (order-flow
 imbalance, taker-buy ratio, signed VWAP) depend on the *aggressor*. Naively
 doing `if side == "buy": buy_pressure += size` labels every trade **backwards** —
-a silent correctness bug (the dashboard shows bullish when it's bearish). When we
-compute these (Days 12-13), derive an explicit `aggressor_side = opposite(side)`
+a silent correctness bug (the dashboard shows bullish when it's bearish). When
+computing these metrics, derive an explicit `aggressor_side = opposite(side)`
 column so nobody downstream misreads it.
 
 ### 3. No ingestion timestamp in the payload
 `time` is the exchange **event time** (when the trade happened), *not* when we
 received/stored it (**processing time**). They differ due to network lag,
-reconnects, and replays. Event time drives correctness (windowing + watermarks,
-Day 13 — a late trade must still land in the correct candle); we stamp our own
-**ingestion time** at bronze (Day 10) to measure latency and lag. Conflating the
+reconnects, and replays. Event time drives correctness (windowing + watermarks —
+a late trade must still land in the correct candle); we stamp our own
+**ingestion time** at bronze to measure latency and lag. Conflating the
 two is a classic streaming bug.
 
 ### 4. One taker order can produce many `match` messages ("sweeping")
@@ -174,7 +174,6 @@ rolling-window stats in `explore_feed.py`. Representative run: 645 trades / 53s.
   not raw volume.
 - **Keying by `product_id`** preserves per-market trade ordering, but BTC is
   usually the busiest partition — a real (if moderate, and time-varying)
-  **data-skew** example to call out (Day 3/4 partition-count decision, Day 14
-  layout discussion).
+  **data-skew** example to call out (partition-count and data-layout decisions).
 - **Volume (~1M trades/day)** is small enough that the local MinIO lakehouse is
   comfortable even over weeks of data.

@@ -31,7 +31,7 @@ aggregates and reprocessing, both sharing the Delta lakehouse.
   path, reprocess by replaying the log. We would choose Kappa if a single
   streaming job with replay could meet both latency *and* correctness needs
   (and the team wanted to avoid dual maintenance). Here we intentionally build
-  Lambda for the learning/portfolio value, and document Kappa as the path we'd
-  consolidate toward in production. (Revisit as a possible superseding ADR.)
+  Lambda to exercise both paths, and document Kappa as the path we'd consolidate
+  toward in production. (Revisit as a possible superseding ADR.)
 - **Batch-only** — no real-time story; fails the live-dashboard requirement.
 - **Streaming-only, no history** — no backfill/correctness guarantees. Rejected.

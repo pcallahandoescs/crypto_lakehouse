@@ -1,4 +1,4 @@
-# Bronze ingestion (Day 10): Kafka → Delta, exactly-once
+# Bronze ingestion: Kafka → Delta, exactly-once
 
 The first pipeline stage. A Spark Structured Streaming job
 ([`spark_jobs/bronze_ingest.py`](../spark_jobs/bronze_ingest.py)) reads
@@ -11,14 +11,14 @@ Bronze is a **faithful, immutable copy of the source**. Each row is:
 
 | Column | Source | Why |
 |---|---|---|
-| `key` | Kafka message key | the `product_id` we keyed on (Day 4) |
+| `key` | Kafka message key | the `product_id` the producer keyed on |
 | `value` | Kafka message value | the **exact JSON string** Coinbase sent |
 | `topic`, `partition`, `offset` | Kafka metadata | provenance + exact position in the log |
 | `kafka_timestamp`, `kafka_timestamp_type` | Kafka metadata | broker-side event time |
 | `ingest_timestamp` | `current_timestamp()` | when *we* landed it |
 
 Crucially, there is **no JSON parsing, casting, or cleaning** here. That's
-silver's job (Day 11). Keeping bronze raw is a deliberate principle:
+silver's job. Keeping bronze raw is a deliberate principle:
 
 - **Replayability** — if a bug is found in the silver/gold logic later, we can
   reprocess from bronze without re-fetching from Coinbase (which is live-only and
@@ -29,7 +29,7 @@ silver's job (Day 11). Keeping bronze raw is a deliberate principle:
 ## Immutability
 
 Bronze is **append-only**: the stream only ever adds rows; nothing updates or
-deletes. Combined with Kafka retention, this is what makes backfills (Day 17) and
+deletes. Combined with Kafka retention, this is what makes backfills and
 the replay/Kappa story real. Corrections happen *downstream* (silver/gold), never
 by mutating bronze.
 
@@ -59,7 +59,8 @@ which is why the checkpoint is part of the table's contract, not a throwaway.
 ## Run it
 
 The Kafka connector JARs are baked into the Spark image (see
-[`spark_jobs/Dockerfile`](../spark_jobs/Dockerfile)), so rebuild once after Day 9:
+[`spark_jobs/Dockerfile`](../spark_jobs/Dockerfile)), so rebuild once if the image
+changed:
 
 ```bash
 docker compose build spark

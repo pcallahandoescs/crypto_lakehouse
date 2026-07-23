@@ -1,4 +1,4 @@
-"""Day 15: data quality checks for silver and gold Delta tables.
+"""Data quality checks for silver and gold Delta tables.
 
 Custom PySpark checks (Great Expectations is the scale alternative — same ideas,
 heavier ops). Each check returns a CheckResult; failures are logged as alerts.

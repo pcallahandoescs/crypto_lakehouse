@@ -27,7 +27,7 @@ standard S3A connector — the identical code path used against real S3.
 ## Alternatives considered
 
 - **Cloud object storage (S3/GCS/ADLS)** — the production target, but not
-  self-hosted/free for a local portfolio stack. The S3A path means we can move
+  self-hosted/free for a local stack. The S3A path means we can move
   there trivially. Deferred, not rejected.
 - **Local filesystem / HDFS** — filesystem isn't object storage (misses the
   decoupling/portability lesson); HDFS is heavy and legacy for this use. Rejected.

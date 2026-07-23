@@ -6,7 +6,7 @@ consequences (good and bad). They are short, immutable, and numbered — a
 decision is never edited away; if it changes, a new ADR supersedes it.
 
 Why keep them: the *why* behind a system is the first thing lost to time and the
-most valuable thing to a new engineer (or an interviewer). ADRs make the
+most valuable thing to a new engineer (or a future maintainer). ADRs make the
 reasoning durable. See [ADR 0001](./0001-record-architecture-decisions.md).
 
 ## Status legend

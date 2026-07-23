@@ -1,4 +1,4 @@
-"""Day 16: idempotent Delta writes via MERGE (upsert).
+"""Idempotent Delta writes via MERGE (upsert).
 
 Running a batch job twice must leave the table in the same state — no duplicate
 rows, no partial double-writes. Delta's MERGE matches on a deterministic key:

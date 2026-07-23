@@ -35,7 +35,7 @@ for bucket creation).
   readiness is delegated to clients, which retry. (See `docs/minio_setup.md`.)
 - On Chainguard's **free tier only `:latest` is available** (pinned/versioned tags
   need a paid subscription). So we can't fully pin the MinIO version for free —
-  an accepted tradeoff for a local/portfolio project; a funded team would pin.
+  an accepted tradeoff for a local project; a funded team would pin.
 
 ## Alternatives considered
 

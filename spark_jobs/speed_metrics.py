@@ -1,4 +1,4 @@
-"""Day 13: the Lambda speed layer -- real-time windowed metrics.
+"""The Lambda speed layer -- real-time windowed metrics.
 
 The batch path (bronze -> silver -> gold) is correct but slow: it lands, cleans,
 and recomputes on a schedule. The **speed layer** is its low-latency complement.
@@ -113,7 +113,7 @@ def main() -> None:
     # end (i.e. it's final and no more late data will change it). That's the
     # durable, exactly-once-friendly choice for a Delta sink; the cost is that a
     # window appears ~watermark after it closes. (A lower-latency variant would
-    # use foreachBatch + MERGE to upsert in-progress windows -- overlaps Day 16.)
+    # use foreachBatch + MERGE to upsert in-progress windows.)
     query = (
         metrics.writeStream.format("delta")
         .outputMode("append")

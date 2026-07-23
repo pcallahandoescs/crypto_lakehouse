@@ -1,5 +1,6 @@
-# Local ingestion stack. Day 3: a single-broker Apache Kafka in KRaft mode.
-# More services (MinIO, Spark, Airflow, ...) are added in later weeks.
+# Local stack for the lakehouse: Kafka, MinIO, Spark, and Airflow on one network.
+#
+# Kafka is a single-broker Apache Kafka in KRaft mode.
 #
 # KRaft = Kafka's built-in Raft-based metadata layer. It replaces ZooKeeper, so
 # this one container is the entire Kafka control + data plane (no separate ZK).
@@ -11,7 +12,7 @@ services:
     container_name: kafka
     ports:
       # Only the HOST listener is published to your machine. Clients on the host
-      # (console tools, the Day 4 producer) connect via localhost:9092.
+      # (console tools, the producer) connect via localhost:9092.
       - "9092:9092"
     environment:
       # --- KRaft: this single node is BOTH broker and controller ---
@@ -78,7 +79,7 @@ services:
     restart: unless-stopped
 
   # ----------------------------------------------------------------------------
-  # MinIO (Day 8): S3-compatible object storage — the lakehouse storage layer.
+  # MinIO: S3-compatible object storage — the lakehouse storage layer.
   # Delta tables (bronze/silver/gold) will live here, reached by Spark via the
   # S3A connector exactly as they would against real S3 — so the design is
   # cloud-portable (swap MinIO for S3/GCS/ADLS with a config change).
@@ -123,7 +124,7 @@ services:
     restart: on-failure
 
   # ----------------------------------------------------------------------------
-  # Spark job-runner (Day 9): Spark 3.5.3 + Delta + S3A, for reading/writing the
+  # Spark job-runner: Spark 3.5.3 + Delta + S3A, for reading/writing the
   # Delta lakehouse on MinIO. This is a *job runner*, not a long-lived service —
   # it runs a job and exits, so it's behind the "jobs" profile (a plain
   # `docker compose up` won't start it). Run a job with:
@@ -154,7 +155,7 @@ services:
     command: ["/opt/spark/bin/spark-submit", "--master", "local[*]", "test_delta.py"]
 
   # ----------------------------------------------------------------------------
-  # Airflow (Day 18–19): orchestration for batch jobs + backfills.
+  # Airflow: orchestration for batch jobs + backfills.
   # Scheduler submits Spark via Docker Compose (socket + project mount).
   # UI: http://localhost:8088 (admin / admin)
   # Build Spark image first: docker compose --profile jobs build spark
@@ -262,7 +263,7 @@ services:
       - ./airflow/plugins:/opt/airflow/plugins
       - .:/opt/project
       - /var/run/docker.sock:/var/run/docker.sock
-    # Dev-only: root so LocalExecutor can reach the mounted Docker socket (Day 19).
+    # Dev-only: root so LocalExecutor can reach the mounted Docker socket.
     user: "0:0"
     command: scheduler
     healthcheck:

@@ -1,4 +1,4 @@
-"""Day 15: run data quality checks on silver and gold tables.
+"""Run data quality checks on silver and gold tables.
 
 Batch validation job — run after the pipeline (or on a schedule once Airflow
 exists). Logs pass/fail per check, quarantines any row-level violations found,

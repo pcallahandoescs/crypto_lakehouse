@@ -1,7 +1,7 @@
 """Exploration script: watch live trades stream from the Coinbase WebSocket.
 
-This is a *throwaway* tool for Day 2 ("understand the source") — NOT the
-production producer (that's Day 4). Its only job is to let us observe the real
+This is a *throwaway* tool for understanding the source — NOT the production
+producer (see ``producer/main.py``). Its only job is to let us observe the real
 message schema, field types, and message velocity before we design any
 infrastructure around the feed.
 

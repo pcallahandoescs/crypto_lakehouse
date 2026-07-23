@@ -8,8 +8,8 @@
 This project makes many non-obvious technical choices (Kafka vs. alternatives,
 Lambda vs. Kappa, Delta vs. Iceberg, partitioning strategy, ...). The *reasoning*
 behind each is the most valuable and most perishable knowledge in the system —
-it's what a reviewer, an interviewer, or a future maintainer needs, and it's
-exactly what gets lost when it lives only in someone's head or a chat log.
+it's what a reviewer or a future maintainer needs, and it's exactly what gets
+lost when it lives only in someone's head or a chat log.
 
 ## Decision
 
@@ -22,8 +22,7 @@ superseded decision is replaced by a new ADR, not edited away.
 
 - The "why" behind the system is durable and reviewable.
 - Small ongoing discipline: each real decision costs a few minutes to record.
-- The log doubles as interview ammunition — every ADR is a "tell me about a
-  tradeoff you made" answer.
+- Each ADR is a self-contained record of one tradeoff and its alternatives.
 
 ## Alternatives considered
 

@@ -1,4 +1,4 @@
-# Orchestration with Airflow (Day 18–19)
+# Orchestration with Airflow
 
 Airflow coordinates **batch** work: scheduled silver → gold runs, DQ validation,
 and parameterized backfills. Streaming jobs (bronze ingest, silver transform,
@@ -65,13 +65,13 @@ with other services on 8080.
 curl -sf http://localhost:8088/health && echo " ok"
 ```
 
-## DAGs (Day 19)
+## DAGs
 
 | DAG | Schedule | Tasks | Purpose |
 |---|---|---|---|
 | **`batch_lakehouse`** | `0 3 * * *` (03:00 UTC daily) | gold_aggregate_btc → gold_aggregate_eth → dq_validate_silver → dq_validate_gold | One product/layer per Spark container (Docker memory) |
 | **`backfill_lakehouse`** | Manual only | backfill_silver → backfill_gold | Parameterized date-range replay (includes silver MERGE) |
-| `example_lakehouse` | Manual | hello task | Day 18 smoke test |
+| `example_lakehouse` | Manual | hello task | Smoke test |
 
 All DAGs are **paused at creation** — unpause before the schedule fires or trigger
 manually.
@@ -80,10 +80,10 @@ manually.
 
 1. UI → **batch_lakehouse** → Unpause → **Trigger DAG**
 2. Graph: `gold_aggregate_btc` → `gold_aggregate_eth` → `dq_validate_silver` → `dq_validate_gold` (sequential — not parallel; avoids OOM)
+3. Task logs show `docker run ... spark-submit` output
 
 On failure, each task fires `on_failure_callback` (structured `ALERT` log; set
 `SLACK_WEBHOOK_URL` to push to Slack). See [`observability.md`](./observability.md).
-3. Task logs show `docker run ... spark-submit` output
 
 **Note:** `silver_batch.py` is intentionally **not** in this DAG — a full bronze→silver
 MERGE over ~165k rows OOMs on Docker Desktop (exit 137). Use **backfill_lakehouse**
@@ -105,7 +105,7 @@ Default retries: **2** with 5-minute delay between attempts.
 
 3. Graph: `backfill_silver` (--skip-gold) → `backfill_gold` (--skip-silver)
 
-Two tasks mirror the Day 17 OOM-safe CLI pattern.
+Two tasks mirror the OOM-safe CLI pattern (separate container runs).
 
 ## Repository layout
 

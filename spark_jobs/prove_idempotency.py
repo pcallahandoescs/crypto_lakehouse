@@ -1,4 +1,4 @@
-"""Day 16: prove batch MERGE idempotency — run twice, output identical.
+"""Prove batch MERGE idempotency — run twice, output identical.
 
 Each phase uses **four Spark sessions** (count → MERGE → MERGE → count) so no
 single JVM runs two heavy merges. Gold/silver proofs use capped self-MERGE on

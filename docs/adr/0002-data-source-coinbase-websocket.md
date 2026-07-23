@@ -7,9 +7,9 @@
 
 The project needs a **real, live, high-velocity** data source that is legal to
 use and free of licensing friction. Equity market data is encumbered by exchange
-licensing and redistribution rules — a poor fit for a public portfolio repo.
-Crypto market data is publicly streamable without those constraints, and the
-domain (real-time crypto/finance) is directly relevant to the target employers.
+licensing and redistribution rules — a poor fit for a public repo. Crypto market
+data is publicly streamable without those constraints, and the domain (real-time
+crypto/finance) is a genuinely high-velocity, messy source to engineer against.
 
 ## Decision
 
@@ -25,13 +25,13 @@ channel for a small set of products (BTC-USD, ETH-USD), documented in
 - No historical replay from the source itself (WebSocket is live-only); this is
   precisely why Kafka retention + immutable bronze provide our replay story.
 - Dependence on a third-party feed's uptime/format; mitigated by the producer's
-  reconnect logic and the Day 6 data contract catching drift.
+  reconnect logic and the data contract catching drift.
 
 ## Alternatives considered
 
 - **Binance WebSocket** — comparable; Coinbase chosen for familiarity and clean
   schema. Easy to add later as a second source.
 - **A simulated/synthetic feed** — fully controllable but defeats the purpose:
-  no real-world messiness, weaker portfolio signal. Rejected.
+  no real-world messiness to handle. Rejected.
 - **Paid equity data** — licensing/redistribution problems for a public repo.
   Rejected.

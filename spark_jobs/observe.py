@@ -1,4 +1,4 @@
-"""Day 20: observability — structured JSON logging + a run-metrics store.
+"""Observability — structured JSON logging + a run-metrics store.
 
 Two primitives every job shares:
 
@@ -21,10 +21,10 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
+if TYPE_CHECKING:  # heavy JVM import only for type hints — keeps pure helpers importable
+    from pyspark.sql import SparkSession
 
 RUN_METRICS_PATH = os.getenv("OBS_METRICS_PATH", "s3a://gold/_observability/runs")
 
@@ -122,6 +122,8 @@ def load_prior_rows(spark: SparkSession, layer: str) -> int | None:
     Reads the observability table so it is the single metrics store (no separate
     ``_dq/metrics`` write in the memory-tight Airflow path).
     """
+    from pyspark.sql import functions as F
+
     try:
         hist = (
             spark.read.format("delta")

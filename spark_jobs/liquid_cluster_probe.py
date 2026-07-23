@@ -1,4 +1,4 @@
-"""Day 14: probe whether OSS Delta 3.2 supports liquid clustering (CLUSTER BY).
+"""Probe whether OSS Delta 3.2 supports liquid clustering (CLUSTER BY).
 
 Liquid clustering is the modern successor to manual partitioning + Z-order.
 We try it on a throwaway table and report success or the exact error — the

@@ -47,7 +47,7 @@ Two deliberate choices worth calling out:
 
 The natural **dedup key** is `(product_id, trade_id)`: same key ⇒ same trade.
 This is what the verification consumer counts duplicates on, and what silver
-will deduplicate on in Day 11.
+will deduplicate on in the silver layer.
 
 ## How we verify it
 

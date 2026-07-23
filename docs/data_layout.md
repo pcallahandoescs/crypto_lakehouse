@@ -1,10 +1,10 @@
-# Data layout & optimization (Day 14)
+# Data layout & optimization
 
 Once tables hold real data, **physical layout** determines query cost on a
 lakehouse. This doc explains the toolkit we applied and how to measure it with
 [`optimize.py`](../spark_jobs/optimize.py).
 
-## The evolution (what to say in an interview)
+## The evolution
 
 1. **Partitioning** — prune whole directories by a low-cardinality filter column
    (usually date).

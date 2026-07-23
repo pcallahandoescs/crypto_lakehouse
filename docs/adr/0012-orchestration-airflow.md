@@ -9,7 +9,7 @@ The lakehouse has batch Spark jobs (silver, gold, DQ, backfill) that must run in
 order, on a schedule, with retries and an audit trail. Streaming ingestion stays
 outside orchestration (long-lived Structured Streaming queries).
 
-We need an orchestration layer before wiring DAGs (Day 19).
+We need an orchestration layer before wiring the batch DAGs.
 
 ## Decision
 
@@ -26,7 +26,7 @@ Default UI credentials are local-dev only (`admin` / `admin`).
 
 **Positive**
 
-- Industry-standard orchestration; interview-familiar
+- Industry-standard orchestration; widely adopted
 - Dependency graph, scheduling, retries, and UI out of the box
 - Clear separation: Airflow coordinates, Spark computes
 
@@ -34,7 +34,7 @@ Default UI credentials are local-dev only (`admin` / `admin`).
 
 - Another stack to run locally (Postgres + webserver + scheduler)
 - LocalExecutor does not isolate tasks (production would use Celery/Kubernetes executor)
-- Day 19 must bridge Airflow → Spark (DockerOperator or similar)
+- The DAGs must bridge Airflow → Spark (DockerOperator or similar)
 
 ## Alternatives considered
 

@@ -1,9 +1,9 @@
-"""Day 20: observability report — the operations view of the lakehouse.
+"""Observability report — the operations view of the lakehouse.
 
 Reads the run-metrics table written by ``observe.record_run`` and prints the
 latest state per (job, layer): row volume, freshness, and DQ pass/fail. This is
-the "is it healthy?" glance until the FastAPI ``/metrics`` endpoint (Day 22)
-serves the same table over HTTP.
+the "is it healthy?" glance that the FastAPI ``/metrics`` endpoint serves over
+HTTP from the same table.
 
 Run:
     docker compose run --rm spark \

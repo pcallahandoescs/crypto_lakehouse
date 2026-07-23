@@ -7,13 +7,12 @@ requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 authors = [{ name = "Patrick Callahan", email = "patrickcallah@gmail.com" }]
 
-# Runtime dependencies are intentionally empty on Day 1.
-# Each service (producer, spark_jobs, serving, dashboard) adds its own deps as it is built,
-# so we never ship libraries a service doesn't actually use.
+# Each service (producer, spark_jobs, serving, dashboard) adds only the deps it
+# actually uses, so we never ship libraries a service doesn't need.
 dependencies = [
     "confluent-kafka>=2.15.0",
     "websockets>=16.0",
-    # Data contract / schema validation at the ingestion boundary (Day 6).
+    # Data contract / schema validation at the ingestion boundary.
     "pydantic>=2.7",
 ]
 
@@ -26,6 +25,13 @@ dev = [
     "pytest>=8",
     "pytest-cov>=5",
     "pre-commit>=3.7",
+]
+# JVM-backed tier: real Spark transformation + DQ tests (tests/spark/).
+# Kept out of the default dev group so the fast `make check` gate needs no JVM;
+# install with `uv sync --group spark` and run via `make test-spark`.
+spark = [
+    "pyspark==3.5.3",
+    "delta-spark==3.2.0",
 ]
 
 [tool.uv]
@@ -75,10 +81,26 @@ plugins = ["pydantic.mypy"]
 # Only list directories that currently contain code; expand this list as
 # each service (spark_jobs, serving, dashboard) gains real modules.
 files = ["producer", "consumer", "tests"]
+# The Spark tier imports pyspark + spark_jobs modules that aren't type-checked
+# here; it has its own runtime guardrails, so keep it out of the strict gate.
+exclude = ["tests/spark/"]
 
 # confluent-kafka ships no type stubs; treat it as untyped instead of erroring.
 [[tool.mypy.overrides]]
 module = ["confluent_kafka.*"]
+ignore_missing_imports = true
+
+# pyspark ships no stubs; type hints that reference it degrade to Any.
+[[tool.mypy.overrides]]
+module = ["pyspark.*"]
+ignore_missing_imports = true
+
+# spark_jobs/airflow-plugin modules live outside the type-checked set. Tests may
+# import their pure helpers; treat those imports as untyped rather than checking
+# the (JVM-dependent) modules themselves.
+[[tool.mypy.overrides]]
+module = ["observe", "lakehouse.*"]
+follow_imports = "skip"
 ignore_missing_imports = true
 
 # ------------------------------------------------------------------
@@ -87,6 +109,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q --strict-markers"
-# Put the repo root on sys.path so tests can `import producer` etc. without
-# installing the project as a package (we run services from source, uv package=false).
-pythonpath = ["."]
+# Put the repo root + source roots on sys.path so tests can import services and
+# the pure helpers in spark_jobs / airflow plugins without installing packages
+# (we run everything from source; uv package=false).
+# The JVM-backed tests under tests/spark are auto-skipped when pyspark is absent
+# (see tests/conftest.py); run them with `make test-spark`.
+pythonpath = [".", "spark_jobs", "airflow/plugins"]

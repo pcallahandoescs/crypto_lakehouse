@@ -10,8 +10,8 @@ Design notes:
 - **Idempotent producer:** `enable.idempotence` + `acks=all` avoid duplicate or
   lost messages on retry, without sacrificing throughput.
 - **Raw fidelity:** we forward the exact bytes Coinbase sent. Parsing, typing,
-  and timestamps happen downstream (bronze/silver, Days 10-11), so bronze stays
-  a faithful record of the source.
+  and timestamps happen downstream (bronze/silver), so bronze stays a faithful
+  record of the source.
 
 Run (host):
     uv run python -m producer.main
@@ -90,6 +90,21 @@ def _on_delivery(err: Any, msg: Any) -> None:
         _log("delivery_failed", level=logging.ERROR, key=str(msg.key()), error=str(err))
 
 
+def _trade_key(msg: dict[str, Any]) -> str | None:
+    """Return the Kafka partition key (``product_id``) for a publishable trade.
+
+    Returns ``None`` for anything we should skip: non-trade message types
+    (subscriptions, heartbeats, errors) and trades missing a usable product id.
+    Keeping this pure makes the ingest filter unit-testable without a socket.
+    """
+    if msg.get("type") not in TRADE_TYPES:
+        return None
+    product = msg.get("product_id")
+    if isinstance(product, str) and product:
+        return product
+    return None
+
+
 def _subscribe_message(settings: Settings) -> str:
     return json.dumps(
         {
@@ -132,11 +147,8 @@ async def run() -> None:
                     break
 
                 msg: dict[str, Any] = json.loads(raw)
-                if msg.get("type") not in TRADE_TYPES:
-                    continue
-
-                product = msg.get("product_id")
-                if not isinstance(product, str):
+                product = _trade_key(msg)
+                if product is None:
                     continue
 
                 value = raw if isinstance(raw, bytes) else raw.encode()

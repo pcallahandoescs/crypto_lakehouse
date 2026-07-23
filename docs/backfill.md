@@ -1,10 +1,10 @@
-# Backfill & reprocessing (Day 17)
+# Backfill & reprocessing
 
 Batch backfills recompute **silver** and **gold** for a chosen **event-time**
 date range. They rely on two foundations built earlier in the project:
 
-1. **Immutable bronze** — the append-only log of every raw message (Day 10).
-2. **Idempotent MERGE writes** — upsert on grain keys, safe to re-run (Day 16).
+1. **Immutable bronze** — the append-only log of every raw message.
+2. **Idempotent MERGE writes** — upsert on grain keys, safe to re-run.
 
 ## Why bronze, not Coinbase?
 
@@ -111,4 +111,4 @@ not double (MERGE upsert). See [`idempotency.md`](idempotency.md).
 - **New downstream grain** — add a 5-minute gold table; backfill history from silver.
 - **Audit / recovery** — rebuild analytical tables from bronze after an incident.
 
-Day 19 wires this into an Airflow **backfill DAG** with parameterized dates.
+An Airflow **backfill DAG** wires this up with parameterized dates.

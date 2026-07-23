@@ -1,4 +1,4 @@
-# Data quality (Day 15)
+# Data quality
 
 Trust built into the pipeline — not a separate audit you run once and forget.
 [`spark_jobs/dq.py`](../spark_jobs/dq.py) holds reusable PySpark checks;

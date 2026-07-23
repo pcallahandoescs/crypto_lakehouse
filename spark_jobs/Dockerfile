@@ -14,7 +14,7 @@ USER root
 ARG DELTA_VERSION=3.2.0
 ARG HADOOP_AWS_VERSION=3.3.4
 ARG AWS_SDK_VERSION=1.12.530
-# Kafka connector for Structured Streaming (Day 10). Versions are the exact
+# Kafka connector for Structured Streaming. Versions are the exact
 # transitive set for Spark 3.5.3's spark-sql-kafka-0-10.
 ARG SPARK_VERSION=3.5.3
 ARG KAFKA_CLIENTS_VERSION=3.4.1

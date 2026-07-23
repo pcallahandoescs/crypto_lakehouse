@@ -54,7 +54,7 @@ Stack: **Delta 3.2.0** (see [`spark_jobs/Dockerfile`](../spark_jobs/Dockerfile))
 
 ## Measurement
 
-Run and paste results into your notes / interview prep:
+Run and record the before/after results:
 
 ```bash
 optimize.py s3a://bronze/trades

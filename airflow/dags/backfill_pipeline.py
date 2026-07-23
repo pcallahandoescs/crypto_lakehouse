@@ -1,7 +1,7 @@
-"""Day 19: manual backfill DAG — parameterized event-time date range.
+"""Manual backfill DAG — parameterized event-time date range.
 
-Two Spark stages (silver then gold) match the Docker Desktop memory pattern from
-Day 17: separate container runs instead of one heavy JVM.
+Two Spark stages (silver then gold) match the Docker Desktop memory pattern:
+separate container runs instead of one heavy JVM.
 
 Trigger with params (UI → Trigger DAG w/ config):
   {"start_date": "2026-07-05", "end_date": "2026-07-08"}

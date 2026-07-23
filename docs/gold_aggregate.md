@@ -1,4 +1,4 @@
-# Gold aggregation (Day 12): OHLC candles + VWAP + volume
+# Gold aggregation: OHLC candles + VWAP + volume
 
 Third pipeline stage and the **analytical product** — the table consumers (a
 dashboard, an analyst, a model) actually query.
@@ -34,7 +34,7 @@ by time, not the smallest/largest price. A plain `first()`/`last()` in a grouped
 aggregation has **no guaranteed order** (rows arrive in whatever order the shuffle
 produced). `min_by(price, struct(event_time, sequence))` deterministically returns
 the price at the earliest `(event_time, sequence)` — using `sequence` as the
-tie-breaker when two trades share a timestamp (which happens — see the Day-2 feed
+tie-breaker when two trades share a timestamp (which happens — see the feed
 study). This is the correct, deterministic way to get open/close.
 
 ### Why VWAP is a double when everything else is decimal
@@ -51,13 +51,13 @@ So `price*size` and the `sum(size)` used for the ratio are cast to `double`; the
 reported `volume` and OHLC prices remain exact decimals. This is a deliberate,
 documented trade-off — exactness where it's money, pragmatism where it's a mean.
 
-## Batch + idempotent MERGE (Day 16)
+## Batch + idempotent MERGE
 
 Batch job: read all of silver, recompute candles, **MERGE upsert** into gold on
 `(product_id, interval_start)`. Re-running updates matched rows in place — no
 duplicates. See [`idempotency.md`](./idempotency.md).
 
-## Partitioning (Day 14)
+## Partitioning
 
 Gold is **partitioned by `date`** (`to_date(interval_start)`). Typical queries
 filter a calendar day, so Delta can **prune** whole directories. We deliberately

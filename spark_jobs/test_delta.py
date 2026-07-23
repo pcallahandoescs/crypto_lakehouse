@@ -1,4 +1,4 @@
-"""Day 9 smoke test: prove Spark + Delta + MinIO (S3A) work together.
+"""Smoke test: prove Spark + Delta + MinIO (S3A) work together.
 
 Writes a small Delta table to MinIO, appends a second commit, reads it back,
 demonstrates time travel, and prints the _delta_log contents -- the transaction

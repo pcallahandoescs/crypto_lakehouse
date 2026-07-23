@@ -76,7 +76,7 @@ Expected shape:
 
 Browse tables in the MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`).
 
-## 5. Data layout (Day 14)
+## 5. Data layout
 
 After gold is populated, compact and Z-order:
 
@@ -100,7 +100,7 @@ docker compose run --rm spark \
 See [`data_layout.md`](./data_layout.md) for the concepts and how to read the
 before/after numbers.
 
-## 6. Data quality (Day 15)
+## 6. Data quality
 
 After silver and gold are populated:
 
@@ -111,7 +111,7 @@ docker compose run --rm spark \
 
 Expect all checks **PASS** on clean data. See [`data_quality.md`](./data_quality.md).
 
-## 7. Idempotency proof (Day 16)
+## 7. Idempotency proof
 
 ```bash
 docker compose run --rm spark \
@@ -120,7 +120,7 @@ docker compose run --rm spark \
 
 See [`idempotency.md`](./idempotency.md).
 
-## 8. Backfill (Day 17)
+## 8. Backfill
 
 Reprocess a date range from **immutable bronze** into silver and gold (MERGE
 upserts — safe to re-run). Bounds are UTC: `[--start, --end)` (end exclusive).
@@ -141,7 +141,7 @@ docker compose run --rm spark \
 
 See [`backfill.md`](./backfill.md).
 
-## 9. Airflow (Day 18)
+## 9. Airflow
 
 ```bash
 docker compose --profile orchestration up -d
@@ -159,14 +159,14 @@ docker compose --profile jobs build spark
 docker compose --profile orchestration build
 ```
 
-**Day 19 DAGs** (unpause → trigger manually):
+**Pipeline DAGs** (unpause → trigger manually):
 
 | DAG | What it runs |
 |---|---|
 | `batch_lakehouse` | gold_aggregate_btc → gold_aggregate_eth → dq_validate_silver → dq_validate_gold (nightly 03:00 UTC) |
 | `backfill_lakehouse` | Parameterized backfill — trigger with `{"start_date":"2026-07-05","end_date":"2026-07-08"}` |
 
-## 9a. Observability (Day 20)
+## 9a. Observability
 
 Structured JSON logs on every job + a Delta run-metrics table
 (`s3a://gold/_observability/runs`). See [`observability.md`](./observability.md).
@@ -179,6 +179,18 @@ docker compose run --rm spark \
 
 Task failures fire an Airflow `on_failure_callback` (structured `ALERT` log; set
 `SLACK_WEBHOOK_URL` to also push to Slack).
+
+## 9b. Tests & CI
+
+Two tiers (see the README for the split):
+
+```bash
+make check       # fast gate: ruff + mypy + pytest (pure-Python) — what CI runs
+make test-spark  # JVM tier: real Spark transformation + DQ tests (needs Java 17)
+```
+
+GitHub Actions runs `make check` on every push/PR (build badge in the README);
+the Spark tier runs in a separate workflow.
 
 ## 10. Useful debug commands
 

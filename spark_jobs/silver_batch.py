@@ -1,9 +1,9 @@
-"""Day 16: batch bronze -> silver via MERGE upsert (idempotent).
+"""Batch bronze -> silver via MERGE upsert (idempotent).
 
 The streaming silver job (silver_transform.py) is for continuous ingestion.
 This batch path is for **reprocessing**: read bronze, conform valid trades, and
 MERGE into silver on (product_id, trade_id). Re-running after a logic fix or
-during a backfill (Day 17) updates existing keys in place — no duplicates.
+during a backfill updates existing keys in place — no duplicates.
 
 Invalid rows append to the quarantine table (same as the stream).
 

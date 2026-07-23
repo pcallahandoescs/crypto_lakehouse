@@ -1,8 +1,8 @@
-# MinIO Setup (Day 8): object storage for the lakehouse
+# MinIO Setup: object storage for the lakehouse
 
 The storage foundation. **MinIO** is an S3-compatible object store, defined in
 [`docker-compose.yml`](../docker-compose.yml). The Delta medallion tables
-(bronze → silver → gold) will live here starting Day 9.
+(bronze → silver → gold) live here.
 
 ## Why object storage (and not a database or a filesystem)
 
@@ -43,7 +43,7 @@ in [ADR 0011](./adr/0011-minio-image-chainguard.md).
 
 We create three buckets, one per medallion layer:
 
-| Bucket | Layer | Contents (from Day 9 on) |
+| Bucket | Layer | Contents |
 |---|---|---|
 | `bronze` | raw | trades exactly as ingested, append-only, immutable |
 | `silver` | clean | parsed, typed, deduplicated trades |

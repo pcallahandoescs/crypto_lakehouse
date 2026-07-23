@@ -1,8 +1,8 @@
-"""Day 10: stream Kafka -> bronze Delta (append-only, exactly-once).
+"""Stream Kafka -> bronze Delta (append-only, exactly-once).
 
 Reads `crypto.trades.raw` and lands each message *verbatim* in a bronze Delta
 table, adding Kafka provenance (topic/partition/offset/timestamp) and an
-ingestion timestamp. No parsing or typing -- that's silver (Day 11). Bronze is an
+ingestion timestamp. No parsing or typing -- that's silver's job. Bronze is an
 immutable, faithful copy of the source: our replay + audit foundation.
 
 Exactly-once: Structured Streaming records the Kafka offsets for each micro-batch

@@ -1,4 +1,4 @@
-"""Day 20: task-failure alerting for lakehouse DAGs.
+"""Task-failure alerting for lakehouse DAGs.
 
 Airflow already retries and records state; alerting adds the *push* — a single
 structured line that a log drain (Slack/email/PagerDuty) can match and forward.

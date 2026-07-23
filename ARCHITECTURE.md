@@ -81,8 +81,8 @@ Building **both** lets the project *demonstrate* the distinction rather than nam
 it. The tradeoff — Lambda's cost is maintaining two code paths — is real, so the
 README/ADR also states **when we'd consolidate to Kappa**: if a single streaming
 path with replay (from Kafka + Delta) could satisfy both latency and correctness
-needs, the operational simplicity would win. Here, showing the contrast is a
-deliberate learning/portfolio goal. See
+needs, the operational simplicity would win. Here, building both paths makes the
+contrast demonstrable rather than theoretical. See
 [ADR 0006](./docs/adr/0006-lambda-architecture.md).
 
 ## 5. The medallion (storage) model
@@ -90,8 +90,7 @@ deliberate learning/portfolio goal. See
 - **Bronze** — raw trades exactly as ingested from Kafka, append-only and
   immutable, plus an ingestion timestamp. It is the **replay source** and audit
   record; everything else is derivable from it. (Even the two malformed test
-  messages from Day 3 live here — bronze records the source faithfully, warts
-  and all.)
+  messages live here — bronze records the source faithfully, warts and all.)
 - **Silver** — parsed, typed (prices/sizes as `Decimal`), standardized, and
   **deduplicated** on `(product_id, trade_id)` with a watermark. Malformed rows
   are dropped/quarantined. This is the trustworthy base for analytics.
@@ -100,7 +99,7 @@ deliberate learning/portfolio goal. See
 
 Data-layout optimization (partitioning, `OPTIMIZE`/compaction, Z-ordering,
 `VACUUM`, and an evaluation of liquid clustering) is applied and **measured** on
-the gold tables in Week 2 — see the reserved ADRs
+the gold tables — see ADRs
 [0009](./docs/adr/0009-partitioning-strategy.md) and
 [0010](./docs/adr/0010-zorder-vs-liquid-clustering.md).
 
@@ -123,22 +122,24 @@ the gold tables in Week 2 — see the reserved ADRs
 - **Local:** `docker compose up` wires the whole stack on one Docker network.
   Kafka advertises a `HOST` listener (`localhost:9092`) for laptop tools and a
   `DOCKER` listener (`kafka:29092`) for in-network services.
-- **Kubernetes (Week 4):** stateless apps (producer, API, dashboard) become
+- **Kubernetes (planned):** stateless apps (producer, API, dashboard) become
   Deployments; stateful backbone (Kafka, MinIO) become StatefulSets with
   PersistentVolumeClaims; config via ConfigMaps/Secrets; packaged with Helm.
 
 ## 8. Build status
 
-| Week | Milestone | Status |
-|---|---|---|
-| 1 | Live data flowing into Kafka, containerized, verified, documented | **complete** |
-| 2 | Full Lambda pipeline end-to-end in Compose | **complete (Day 14)** |
-| 3 | Production rigor: DQ, idempotency, replay, orchestration, tests, CI | pending |
-| 4 | Serving + Kubernetes deployment + documentation | pending |
+| Milestone | Status |
+|---|---|
+| Live data flowing into Kafka, containerized, verified, documented | **complete** |
+| Full Lambda pipeline end-to-end in Compose | **complete** |
+| Production rigor: DQ, idempotency, replay, orchestration, observability, tests, CI | **in progress** |
+| Serving + Kubernetes deployment + documentation | pending |
 
-**Week 2 to date:** Spark + Delta + MinIO; bronze streaming ingestion (exactly-once);
-silver parse/type/dedup; batch gold OHLC/VWAP candles; speed-layer rolling metrics;
-date-partitioned gold + `OPTIMIZE`/Z-order/VACUUM toolkit; end-to-end runbook.
+**Implemented to date:** Spark + Delta + MinIO; bronze streaming ingestion
+(exactly-once); silver parse/type/dedup; batch gold OHLC/VWAP candles;
+speed-layer rolling metrics; date-partitioned gold + `OPTIMIZE`/Z-order/VACUUM
+toolkit; data-quality checks with quarantine; idempotent MERGE writes + backfill;
+Airflow batch + backfill DAGs; structured logging + a run-metrics table.
 See [`docs/runbook.md`](./docs/runbook.md).
 
 ## 9. Where to read more
