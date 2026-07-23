@@ -9,7 +9,8 @@
 
 **Status:** Live trades flow Kafka → bronze → silver → gold, plus a real-time
 speed layer — orchestrated with Airflow, covered by data-quality checks, and
-observable via structured logs + a run-metrics table. See the
+observable via structured logs + a run-metrics table. The gold layer is served
+over HTTP by a JVM-free [FastAPI](./docs/serving.md) API. See the
 [runbook](./docs/runbook.md) to reproduce the stack.
 
 Full design and the reasoning behind every choice:
@@ -50,9 +51,9 @@ flowchart TD
     AIRFLOW["Airflow<br/>(orchestrates batch + backfills)"] -.-> BATCH
 ```
 
-> This diagram is the target design; the serving and Kubernetes layers are still
-> in progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the
-> Lambda rationale, and current build status.
+> This diagram is the target design; the dashboard and Kubernetes layers are
+> still in progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full
+> design, the Lambda rationale, and current build status.
 
 ## Tech stack
 
@@ -78,7 +79,7 @@ Alternatives considered for each choice are documented in the
 producer/     # Coinbase WebSocket -> Kafka producer service
 spark_jobs/   # Spark Structured Streaming + batch jobs (bronze/silver/gold)
 airflow/      # DAGs orchestrating the batch layer + backfills
-serving/      # FastAPI service querying the gold Delta tables
+serving/      # FastAPI service serving the gold Delta tables via delta-rs (no Spark)
 dashboard/    # Live candlestick dashboard
 k8s/          # Kubernetes manifests / Helm chart
 docs/         # Data schema, Kafka setup, data contract
@@ -94,6 +95,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Docker.
 make install      # sync the virtualenv from pyproject + uv.lock
 make check        # lint + format-check + typecheck + tests (the CI gate)
 make test-spark   # JVM-backed Spark transformation/DQ tests (needs Java 17)
+make serve        # run the FastAPI serving API against local MinIO
 make hooks        # install pre-commit git hooks
 ```
 
@@ -111,8 +113,9 @@ the gate.
 
 - **Foundations & ingestion** — live data flowing into Kafka, containerized. **Done.**
 - **Lakehouse & processing** — full Lambda pipeline end-to-end in Compose. **Done.**
-- **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **In progress.**
-- **Serving & deployment** — FastAPI + dashboard, Kubernetes + Helm, docs. **Planned.**
+- **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **Done.**
+- **Serving** — FastAPI read API over the gold layer (delta-rs, no Spark). **Done.**
+- **Deployment** — live dashboard, Kubernetes + Helm. **Planned.**
 
 ## License
 

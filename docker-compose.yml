@@ -274,6 +274,32 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # ----------------------------------------------------------------------------
+  # Serving API: a JVM-free FastAPI over the gold layer. Reads gold Delta tables
+  # straight from MinIO via delta-rs (no Spark), so it's a lightweight,
+  # long-lived service — starts with a plain `docker compose up`.
+  #   Docs:     http://localhost:8000/docs
+  #   Candles:  http://localhost:8000/candles?product=BTC-USD
+  # ----------------------------------------------------------------------------
+  serving:
+    build:
+      context: .
+      dockerfile: serving/Dockerfile
+    image: crypto-lakehouse-serving:0.1.0
+    container_name: serving
+    depends_on:
+      - minio
+    environment:
+      # delta-rs reaches MinIO the same S3-compatible way Spark does.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      GOLD_BASE_URI: s3://gold
+      PRODUCTS: "BTC-USD,ETH-USD"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
 volumes:
   kafka-data:
   minio-data:

@@ -1,7 +1,7 @@
 # Developer entry points. Run `make help` to list targets.
 # Everything runs through `uv run` so it uses the locked project environment.
 
-.PHONY: help install lint format format-check typecheck test test-spark check hooks clean
+.PHONY: help install lint format format-check typecheck test test-spark check serve hooks clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -29,6 +29,10 @@ test-spark: ## Run the JVM-backed Spark transformation/DQ tests (needs Java 17)
 	uv run --group spark pytest tests/spark
 
 check: lint format-check typecheck test ## Run all quality gates (what CI runs)
+
+serve: ## Run the FastAPI serving API locally against MinIO (localhost:9000)
+	MINIO_ENDPOINT=$${MINIO_ENDPOINT:-http://localhost:9000} \
+		uv run uvicorn serving.main:app --reload --port 8000
 
 hooks: ## Install pre-commit git hooks
 	uv run pre-commit install

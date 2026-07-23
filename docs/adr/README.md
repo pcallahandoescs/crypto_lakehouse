@@ -33,6 +33,7 @@ reasoning durable. See [ADR 0001](./0001-record-architecture-decisions.md).
 | [0011](./0011-minio-image-chainguard.md) | MinIO container image: Chainguard | Accepted |
 | [0012](./0012-orchestration-airflow.md) | Orchestration with Apache Airflow | Accepted |
 | [0013](./0013-observability-approach.md) | Observability: structured logs + Delta metrics table | Accepted |
+| [0014](./0014-serving-api-fastapi-deltars.md) | Serving API: FastAPI + delta-rs (no Spark) | Accepted |
 
 ## Template
 
