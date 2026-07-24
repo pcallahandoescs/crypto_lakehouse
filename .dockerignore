@@ -1,5 +1,6 @@
-# Keep the Docker build context small and reproducible. Only pyproject.toml,
-# uv.lock, and producer/ are actually copied into the image.
+# Keep the Docker build context small and reproducible. This file is shared by
+# every service build, so it must not exclude a source dir that any image copies
+# (producer/, serving/, dashboard/). Each Dockerfile still COPYs only its own dir.
 
 # Virtualenvs / caches
 .venv/
@@ -14,14 +15,13 @@
 .gitignore
 _local/
 
-# Everything not needed to build the producer image
+# Not needed by any image build (serving/ and dashboard/ are intentionally NOT
+# excluded — their images copy them).
 docs/
 tests/
 scripts/
 airflow/
 spark_jobs/
-serving/
-dashboard/
 k8s/
 *.md
 Makefile
