@@ -10,7 +10,8 @@
 **Status:** Live trades flow Kafka → bronze → silver → gold, plus a real-time
 speed layer — orchestrated with Airflow, covered by data-quality checks, and
 observable via structured logs + a run-metrics table. The gold layer is served
-over HTTP by a JVM-free [FastAPI](./docs/serving.md) API. See the
+over HTTP by a JVM-free [FastAPI](./docs/serving.md) API and visualized in a
+live [Streamlit dashboard](./docs/dashboard.md). See the
 [runbook](./docs/runbook.md) to reproduce the stack.
 
 Full design and the reasoning behind every choice:
@@ -51,9 +52,9 @@ flowchart TD
     AIRFLOW["Airflow<br/>(orchestrates batch + backfills)"] -.-> BATCH
 ```
 
-> This diagram is the target design; the dashboard and Kubernetes layers are
-> still in progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full
-> design, the Lambda rationale, and current build status.
+> This diagram is the target design; the Kubernetes deployment layer is still in
+> progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the
+> Lambda rationale, and current build status.
 
 ## Tech stack
 
@@ -80,8 +81,8 @@ producer/     # Coinbase WebSocket -> Kafka producer service
 spark_jobs/   # Spark Structured Streaming + batch jobs (bronze/silver/gold)
 airflow/      # DAGs orchestrating the batch layer + backfills
 serving/      # FastAPI service serving the gold Delta tables via delta-rs (no Spark)
-dashboard/    # Live candlestick dashboard
-k8s/          # Kubernetes manifests / Helm chart
+dashboard/    # Streamlit + Plotly UI reading the serving API (candlesticks + metrics)
+k8s/          # Kubernetes manifests (kind cluster + StatefulSet backbone)
 docs/         # Data schema, Kafka setup, data contract
 docs/adr/     # Architecture Decision Records (the decisions log)
 tests/        # Unit tests (transformations, DQ logic)
@@ -96,6 +97,7 @@ make install      # sync the virtualenv from pyproject + uv.lock
 make check        # lint + format-check + typecheck + tests (the CI gate)
 make test-spark   # JVM-backed Spark transformation/DQ tests (needs Java 17)
 make serve        # run the FastAPI serving API against local MinIO
+make dashboard    # run the Streamlit dashboard against the serving API
 make hooks        # install pre-commit git hooks
 ```
 
@@ -114,8 +116,8 @@ the gate.
 - **Foundations & ingestion** — live data flowing into Kafka, containerized. **Done.**
 - **Lakehouse & processing** — full Lambda pipeline end-to-end in Compose. **Done.**
 - **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **Done.**
-- **Serving** — FastAPI read API over the gold layer (delta-rs, no Spark). **Done.**
-- **Deployment** — live dashboard, Kubernetes + Helm. **Planned.**
+- **Serving & UI** — FastAPI read API over gold (delta-rs, no Spark) + a live Streamlit dashboard. **Done.**
+- **Deployment** — Kubernetes (kind): stateful backbone (Kafka + MinIO) on StatefulSets; app tier + Helm next. **In progress.**
 
 ## License
 

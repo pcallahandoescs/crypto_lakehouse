@@ -1,0 +1,27 @@
+# kind (Kubernetes-IN-Docker) cluster definition.
+#
+# kind runs a whole cluster inside Docker containers — the fastest way to get a
+# real, conformant Kubernetes API locally (vs. minikube's VM). One control-plane
+# node is plenty for this single-replica stack.
+#
+# Create it with:
+#     kind create cluster --config k8s/kind-cluster.yaml
+#
+# extraPortMappings forward host ports to the node so we can reach NodePort
+# Services from the laptop without port-forward. The stateful backbone (this day)
+# is reached via `kubectl port-forward`; these mappings are reserved for the app
+# services (serving/dashboard) added on Day 25.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: crypto-lakehouse
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30900 # -> MinIO S3 API (NodePort, optional)
+        hostPort: 9000
+      - containerPort: 30901 # -> MinIO console (NodePort, optional)
+        hostPort: 9001
+      - containerPort: 30800 # -> serving API (Day 25)
+        hostPort: 8000
+      - containerPort: 30850 # -> dashboard (Day 25)
+        hostPort: 8501

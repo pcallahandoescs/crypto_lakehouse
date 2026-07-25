@@ -134,15 +134,19 @@ the gold tables — see ADRs
 | Full Lambda pipeline end-to-end in Compose | **complete** |
 | Production rigor: DQ, idempotency, replay, orchestration, observability, tests, CI | **complete** |
 | Serving: FastAPI read API over gold (delta-rs, no Spark) | **complete** |
-| Dashboard + Kubernetes deployment | pending |
+| Dashboard: live Streamlit + Plotly UI over the serving API | **complete** |
+| Kubernetes deployment (kind): stateful backbone (Kafka + MinIO) | **in progress** |
+| Kubernetes app tier + Helm | pending |
 
 **Implemented to date:** Spark + Delta + MinIO; bronze streaming ingestion
 (exactly-once); silver parse/type/dedup; batch gold OHLC/VWAP candles;
 speed-layer rolling metrics; date-partitioned gold + `OPTIMIZE`/Z-order/VACUUM
 toolkit; data-quality checks with quarantine; idempotent MERGE writes + backfill;
 Airflow batch + backfill DAGs; structured logging + a run-metrics table; a
-JVM-free FastAPI serving API over the gold layer.
-See [`docs/runbook.md`](./docs/runbook.md) and [`docs/serving.md`](./docs/serving.md).
+JVM-free FastAPI serving API over the gold layer; a live Streamlit + Plotly
+dashboard reading that API.
+See [`docs/runbook.md`](./docs/runbook.md), [`docs/serving.md`](./docs/serving.md),
+and [`docs/dashboard.md`](./docs/dashboard.md).
 
 ## 9. Where to read more
 
@@ -151,5 +155,7 @@ See [`docs/runbook.md`](./docs/runbook.md) and [`docs/serving.md`](./docs/servin
 - Data contract: [`docs/data_contract.md`](./docs/data_contract.md)
 - End-to-end runbook: [`docs/runbook.md`](./docs/runbook.md)
 - Serving API: [`docs/serving.md`](./docs/serving.md)
+- Dashboard: [`docs/dashboard.md`](./docs/dashboard.md)
+- Kubernetes deployment: [`docs/kubernetes.md`](./docs/kubernetes.md)
 - Data layout & optimization: [`docs/data_layout.md`](./docs/data_layout.md)
 - All decisions with alternatives: [`docs/adr/`](./docs/adr/)

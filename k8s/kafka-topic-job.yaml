@@ -1,0 +1,35 @@
+# One-shot init Job: create the raw trades topic (auto-create is disabled), the
+# K8s analogue of scripts/create_topics.sh.
+#
+# Retries until the broker is reachable (OnFailure + backoffLimit); --if-not-exists
+# makes it idempotent so re-applying is safe.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topic
+  labels:
+    app: kafka
+spec:
+  backoffLimit: 30
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topic
+          image: apache/kafka:4.0.0
+          command:
+            - /opt/kafka/bin/kafka-topics.sh
+            - --bootstrap-server
+            - kafka:9092
+            - --create
+            - --if-not-exists
+            - --topic
+            - crypto.trades.raw
+            - --partitions
+            - "6"
+            - --replication-factor
+            - "1"

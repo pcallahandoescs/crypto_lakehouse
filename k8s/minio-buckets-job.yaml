@@ -1,0 +1,37 @@
+# One-shot init Job: create the medallion buckets, then exit — the K8s analogue
+# of the Compose `createbuckets` container.
+#
+# It races MinIO's startup, so `restartPolicy: OnFailure` + a generous
+# `backoffLimit` let it retry until MinIO accepts connections (same idea as
+# Compose's restart:on-failure). `mb --ignore-existing` makes it idempotent, so
+# re-applying the manifests is safe.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-createbuckets
+  labels:
+    app: minio
+spec:
+  backoffLimit: 30
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: cgr.dev/chainguard/minio-client:latest
+          env:
+            - name: MC_HOST_local
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MC_HOST_local
+          args:
+            - mb
+            - --ignore-existing
+            - local/bronze
+            - local/silver
+            - local/gold

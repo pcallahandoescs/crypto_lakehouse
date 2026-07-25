@@ -1,0 +1,17 @@
+# Kustomize entry point: `kubectl apply -k k8s/` applies the whole stateful
+# backbone as one unit, all pinned to the `crypto` namespace.
+#
+# This day covers the stateful backbone (Kafka + MinIO). The app services
+# (producer, Spark, serving, dashboard) are layered on in Day 25.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: crypto
+
+resources:
+  - namespace.yaml
+  - minio-secret.yaml
+  - minio.yaml
+  - minio-buckets-job.yaml
+  - kafka.yaml
+  - kafka-topic-job.yaml

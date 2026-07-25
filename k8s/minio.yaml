@@ -1,0 +1,91 @@
+# MinIO — S3-compatible object storage, the lakehouse's STORAGE layer.
+#
+# Modeled as a StatefulSet (not a Deployment) because it owns durable state: the
+# StatefulSet gives it a stable network identity (minio-0) and a per-pod
+# PersistentVolumeClaim that survives restarts/rescheduling — exactly what a
+# storage node needs. Deployments are for stateless, interchangeable replicas.
+
+# Headless Service: gives the StatefulSet its stable per-pod DNS
+# (minio-0.minio-headless...). clusterIP: None = no load-balancing VIP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+  labels:
+    app: minio
+spec:
+  clusterIP: None
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+    - name: console
+      port: 9001
+---
+# Regular ClusterIP Service: the stable in-cluster address clients use
+# (http://minio:9000), matching the Compose service name so app config is
+# unchanged between Compose and K8s.
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  labels:
+    app: minio
+spec:
+  serviceName: minio-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      # fsGroup makes the mounted volume group-writable by the container process
+      # regardless of its UID, so MinIO can write /data on the provisioned PVC.
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: minio
+          image: cgr.dev/chainguard/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          envFrom:
+            - secretRef:
+                name: minio-credentials
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  # volumeClaimTemplates: each replica gets its own PVC, provisioned on demand by
+  # kind's default StorageClass (local-path). This is the durable disk.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

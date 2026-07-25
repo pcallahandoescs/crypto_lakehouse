@@ -1,0 +1,8 @@
+# A dedicated namespace isolates the whole stack — one `kubectl delete namespace
+# crypto` tears everything down, and RBAC/quotas can later be scoped to it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crypto
+  labels:
+    app.kubernetes.io/part-of: crypto-lakehouse
