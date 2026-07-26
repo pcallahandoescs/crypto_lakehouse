@@ -15,13 +15,12 @@
 .gitignore
 _local/
 
-# Not needed by any image build (serving/ and dashboard/ are intentionally NOT
-# excluded — their images copy them).
+# Not needed by any image build. serving/, dashboard/, and spark_jobs/ are
+# intentionally NOT excluded — their images copy them in.
 docs/
 tests/
 scripts/
 airflow/
-spark_jobs/
 k8s/
 *.md
 Makefile

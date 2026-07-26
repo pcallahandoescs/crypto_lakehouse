@@ -5,9 +5,10 @@ The stack runs on Docker Compose for local development; Kubernetes is the
 self-healing, rolling updates, and horizontal scaling. This is the migration of a
 known-good system from Compose to K8s, done in two steps:
 
-- **Day 24 (this doc): the stateful backbone** — Kafka + MinIO as StatefulSets,
-  on a local [kind](https://kind.sigs.k8s.io/) cluster.
-- **Day 25: the app services** — producer, Spark jobs, serving API, dashboard.
+- **The stateful backbone** — Kafka + MinIO as StatefulSets, on a local
+  [kind](https://kind.sigs.k8s.io/) cluster.
+- **The app tier** — producer, Spark jobs (streaming Deployments + a batch Job),
+  serving API, and dashboard, layered on top.
 
 ## Why Kubernetes (and why kind locally)
 
@@ -43,13 +44,22 @@ those become Deployments in Day 25.
 ```
 k8s/
   kind-cluster.yaml        # local cluster definition
+  # --- stateful backbone: `kubectl apply -k k8s/` ---
   namespace.yaml           # the `crypto` namespace
   minio-secret.yaml        # MinIO credentials (dev only)
   minio.yaml               # MinIO StatefulSet + Services + PVC
   minio-buckets-job.yaml   # creates bronze/silver/gold buckets
   kafka.yaml               # Kafka StatefulSet + Services + PVC
   kafka-topic-job.yaml     # creates crypto.trades.raw
-  kustomization.yaml       # `kubectl apply -k k8s/` applies it all
+  kustomization.yaml
+  apps/                    # --- app tier: `kubectl apply -k k8s/apps/` ---
+    lakehouse-config.yaml  # shared non-secret env (endpoints, topic)
+    producer.yaml          # Deployment: Coinbase WS -> Kafka
+    spark-streaming.yaml   # Deployments: bronze ingest + speed layer
+    spark-batch-job.yaml   # Job: silver -> gold -> DQ (run on demand)
+    serving.yaml           # Deployment + NodePort: FastAPI (30800 -> :8000)
+    dashboard.yaml         # Deployment + NodePort: Streamlit (30850 -> :8501)
+    kustomization.yaml
 ```
 
 ## Run it
@@ -92,6 +102,54 @@ kubectl -n crypto exec kafka-0 -- \
   /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic crypto.trades.raw
 ```
 
+## Deploy the app tier
+
+The app images are built locally, so they must be **side-loaded into the kind
+node** (there's no registry to pull from); the manifests use
+`imagePullPolicy: IfNotPresent` to match.
+
+```bash
+# 1. Build the images (spark bakes the job code in — K8s has no bind-mount)
+docker build -f producer/Dockerfile  -t crypto-lakehouse-producer:0.1.0  .
+docker build -f serving/Dockerfile   -t crypto-lakehouse-serving:0.1.0   .
+docker build -f dashboard/Dockerfile -t crypto-lakehouse-dashboard:0.1.0 .
+docker build -f spark_jobs/Dockerfile -t crypto-lakehouse-spark:3.5.3    .
+
+# 2. Load them into the cluster
+for i in producer:0.1.0 serving:0.1.0 dashboard:0.1.0 spark:3.5.3; do
+  kind load docker-image "crypto-lakehouse-$i" --name crypto-lakehouse
+done
+
+# 3. Deploy producer + streaming Spark jobs + serving + dashboard
+kubectl apply -k k8s/apps/
+kubectl -n crypto get pods -w
+```
+
+Once the producer and `bronze-ingest` have run for a minute (bronze needs data
+before silver can read it), run the **batch medallion** to build silver + gold:
+
+```bash
+kubectl -n crypto delete job spark-batch-pipeline --ignore-not-found
+kubectl -n crypto apply -f k8s/apps/spark-batch-job.yaml
+kubectl -n crypto logs -f job/spark-batch-pipeline    # silver -> gold -> DQ
+```
+
+Then the API and dashboard are live at the host ports kind maps
+(`kind-cluster.yaml`):
+
+```bash
+curl 'http://localhost:8000/candles?product=BTC-USD&limit=2'   # serving API
+open http://localhost:8501                                     # dashboard
+```
+
+> **Spark on one node.** The jobs run `spark-submit --master local[*]` inside a
+> single pod (driver = executors), exactly as Compose did — not native
+> Spark-on-K8s cluster mode (separate executor pods), which is a larger lift and
+> unneeded at this scale. Running several drivers on one node causes "batch
+> falling behind" warnings under CPU contention; they're harmless here (Kafka lag
+> stays at 0). Scale a streaming job down with
+> `kubectl -n crypto scale deploy/speed-metrics --replicas=0` to free resources.
+
 ## Access from your laptop
 
 The backbone is reached in-cluster by its Service names (`kafka:9092`,
@@ -110,11 +168,15 @@ kubectl delete -k k8s/            # remove the workloads
 kind delete cluster --name crypto-lakehouse   # or nuke the whole cluster
 ```
 
-## Deferred (later days)
+## Deferred (Day 26)
 
-- **Day 25** — producer/Spark/serving/dashboard as Deployments + Jobs, loading
-  the locally-built images into kind (`kind load docker-image`).
-- **Day 26** — production hardening: resource **requests/limits**, **liveness/
-  readiness/startup probes**, and packaging everything as a **Helm chart** for a
-  one-command, parameterized deploy. (Kept out of these manifests on purpose so
-  this day stays focused on the Compose→K8s translation.)
+Production hardening is intentionally kept out of these manifests so the focus
+stays on the Compose→K8s translation:
+
+- resource **requests/limits** on every workload,
+- **liveness / readiness / startup probes**,
+- packaging everything as a **Helm chart** for a one-command, parameterized deploy.
+
+Also future: running **Airflow** on K8s (today the batch medallion runs as a
+one-shot Job; Airflow orchestration stays in Compose), and native
+**Spark-on-K8s** cluster mode (separate executor pods) instead of `local[*]`.

@@ -1,0 +1,16 @@
+# App tier: `kubectl apply -k k8s/apps/` deploys everything that runs on top of
+# the stateful backbone (apply k8s/ first).
+#
+# The batch pipeline Job (spark-batch-job.yaml) is intentionally excluded — it
+# reads bronze, so it's run on demand once the stream has data (see that file).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: crypto
+
+resources:
+  - lakehouse-config.yaml
+  - producer.yaml
+  - spark-streaming.yaml
+  - serving.yaml
+  - dashboard.yaml

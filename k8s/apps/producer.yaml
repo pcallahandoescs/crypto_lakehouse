@@ -1,0 +1,33 @@
+# Producer — Coinbase WebSocket -> Kafka. A long-lived, stateless service, so a
+# Deployment (not a StatefulSet): if the pod dies it's replaced by an identical
+# one, and it reconnects to the stream on its own.
+#
+# imagePullPolicy: IfNotPresent because the image is side-loaded into the kind
+# node with `kind load docker-image` — there's no registry to pull from.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+        - name: producer
+          image: crypto-lakehouse-producer:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: KAFKA_TOPIC
+              value: "crypto.trades.raw"
+            - name: PRODUCTS
+              value: "BTC-USD,ETH-USD"

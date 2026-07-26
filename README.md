@@ -117,7 +117,7 @@ the gate.
 - **Lakehouse & processing** — full Lambda pipeline end-to-end in Compose. **Done.**
 - **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **Done.**
 - **Serving & UI** — FastAPI read API over gold (delta-rs, no Spark) + a live Streamlit dashboard. **Done.**
-- **Deployment** — Kubernetes (kind): stateful backbone (Kafka + MinIO) on StatefulSets; app tier + Helm next. **In progress.**
+- **Deployment** — Kubernetes (kind): full stack running (Kafka + MinIO StatefulSets, producer/Spark/serving/dashboard); Helm packaging + hardening next. **In progress.**
 
 ## License
 

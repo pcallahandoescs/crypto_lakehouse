@@ -1,0 +1,13 @@
+# Shared non-secret config for the Spark jobs (endpoints + topic). Credentials
+# stay in the minio-credentials Secret; this ConfigMap holds only the safe-to-see
+# wiring, injected via envFrom.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lakehouse-config
+  labels:
+    app: spark
+data:
+  MINIO_ENDPOINT: "http://minio:9000"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  KAFKA_TOPIC: "crypto.trades.raw"

@@ -36,4 +36,12 @@ RUN set -eux; \
     curl -fSL -O "${MAVEN}/org/apache/kafka/kafka-clients/${KAFKA_CLIENTS_VERSION}/kafka-clients-${KAFKA_CLIENTS_VERSION}.jar"; \
     curl -fSL -O "${MAVEN}/org/apache/commons/commons-pool2/${COMMONS_POOL2_VERSION}/commons-pool2-${COMMONS_POOL2_VERSION}.jar"
 
+# Bake the job code into the image so it runs anywhere (Kubernetes has no host
+# bind-mount). In Compose the ./spark_jobs mount shadows these files for live
+# editing; on K8s the baked copies are what run. Same reproducibility rationale
+# as the JARs above.
+COPY spark_jobs/ /opt/spark/work-dir/
+RUN chown -R spark:spark /opt/spark/work-dir
+
 USER spark
+WORKDIR /opt/spark/work-dir

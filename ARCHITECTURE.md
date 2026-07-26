@@ -135,8 +135,8 @@ the gold tables — see ADRs
 | Production rigor: DQ, idempotency, replay, orchestration, observability, tests, CI | **complete** |
 | Serving: FastAPI read API over gold (delta-rs, no Spark) | **complete** |
 | Dashboard: live Streamlit + Plotly UI over the serving API | **complete** |
-| Kubernetes deployment (kind): stateful backbone (Kafka + MinIO) | **in progress** |
-| Kubernetes app tier + Helm | pending |
+| Kubernetes deployment (kind): full stack running (backbone + app tier) | **complete** |
+| Kubernetes production hardening + Helm chart | pending |
 
 **Implemented to date:** Spark + Delta + MinIO; bronze streaming ingestion
 (exactly-once); silver parse/type/dedup; batch gold OHLC/VWAP candles;

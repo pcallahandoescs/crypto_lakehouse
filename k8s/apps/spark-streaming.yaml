@@ -1,0 +1,91 @@
+# Spark Structured Streaming jobs — long-running, so Deployments (a dead driver
+# is replaced and resumes from its Delta checkpoint on MinIO).
+#
+# These run Spark in local[*] mode inside one pod (driver = executors), the same
+# way Compose ran the spark container — not native Spark-on-K8s cluster mode
+# (separate executor pods), which is a larger lift and unnecessary at this scale.
+#
+# Both share config via the lakehouse-config ConfigMap + minio-credentials Secret
+# (root user/password mapped to the ACCESS/SECRET keys the jobs read).
+
+# --- Bronze: Kafka -> bronze Delta (raw, append-only, exactly-once) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bronze-ingest
+  labels:
+    app: spark
+    job: bronze-ingest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      job: bronze-ingest
+  template:
+    metadata:
+      labels:
+        app: spark
+        job: bronze-ingest
+    spec:
+      containers:
+        - name: bronze-ingest
+          image: crypto-lakehouse-spark:3.5.3
+          imagePullPolicy: IfNotPresent
+          command:
+            ["/opt/spark/bin/spark-submit", "--master", "local[*]",
+             "--driver-memory", "2g", "bronze_ingest.py"]
+          envFrom:
+            - configMapRef:
+                name: lakehouse-config
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD
+---
+# --- Speed layer: Kafka -> gold/realtime_metrics (sliding-window metrics) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speed-metrics
+  labels:
+    app: spark
+    job: speed-metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      job: speed-metrics
+  template:
+    metadata:
+      labels:
+        app: spark
+        job: speed-metrics
+    spec:
+      containers:
+        - name: speed-metrics
+          image: crypto-lakehouse-spark:3.5.3
+          imagePullPolicy: IfNotPresent
+          command:
+            ["/opt/spark/bin/spark-submit", "--master", "local[*]",
+             "--driver-memory", "2g", "speed_metrics.py"]
+          envFrom:
+            - configMapRef:
+                name: lakehouse-config
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_USER
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ROOT_PASSWORD

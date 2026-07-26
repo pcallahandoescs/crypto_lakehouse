@@ -59,6 +59,11 @@ services modeled as **StatefulSets**.
 
 ## Follow-ups
 
-- **Day 25** — app services (producer, Spark, serving, dashboard) as Deployments/Jobs.
-- **Day 26** — resource requests/limits, probes, and a Helm chart (deferred here
-  to keep this ADR about the Compose→K8s translation).
+- **App tier (done)** — producer, serving, and dashboard as Deployments (serving/
+  dashboard exposed via NodePort); the Spark streaming jobs (bronze, speed) as
+  Deployments running `spark-submit --master local[*]`, and the batch medallion
+  (silver → gold → DQ) as a one-shot Job. Locally-built images are side-loaded
+  with `kind load docker-image`. Verified end-to-end on kind: live trades flow
+  through to candles served by the API and rendered in the dashboard.
+- **Day 26** — resource requests/limits, probes, and a Helm chart (deferred to
+  keep this ADR about the Compose→K8s translation).
