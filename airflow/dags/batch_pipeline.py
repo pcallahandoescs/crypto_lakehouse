@@ -31,7 +31,7 @@ DEFAULT_ARGS = {
     schedule="0 3 * * *",
     start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=["lakehouse", "batch", "day19"],
+    tags=["lakehouse", "batch"],
     doc_md=__doc__,
 )
 def batch_lakehouse() -> None:

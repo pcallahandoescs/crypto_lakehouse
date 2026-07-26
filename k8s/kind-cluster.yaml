@@ -8,9 +8,9 @@
 #     kind create cluster --config k8s/kind-cluster.yaml
 #
 # extraPortMappings forward host ports to the node so we can reach NodePort
-# Services from the laptop without port-forward. The stateful backbone (this day)
-# is reached via `kubectl port-forward`; these mappings are reserved for the app
-# services (serving/dashboard) added on Day 25.
+# Services from the laptop without port-forward. The stateful backbone (Kafka,
+# MinIO) is reached in-cluster or via `kubectl port-forward`; these mappings
+# expose the app services (serving/dashboard) on the host.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: crypto-lakehouse
@@ -21,7 +21,7 @@ nodes:
         hostPort: 9000
       - containerPort: 30901 # -> MinIO console (NodePort, optional)
         hostPort: 9001
-      - containerPort: 30800 # -> serving API (Day 25)
+      - containerPort: 30800 # -> serving API
         hostPort: 8000
-      - containerPort: 30850 # -> dashboard (Day 25)
+      - containerPort: 30850 # -> dashboard
         hostPort: 8501

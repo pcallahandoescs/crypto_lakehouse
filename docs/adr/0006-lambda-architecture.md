@@ -19,8 +19,8 @@ aggregates and reprocessing, both sharing the Delta lakehouse.
 
 ## Consequences
 
-- We can *demonstrate* the speed/batch distinction and reconcile the two paths —
-  strong senior signal — rather than merely naming it.
+- We can *demonstrate* the speed/batch distinction and reconcile the two paths,
+  rather than merely naming it.
 - Cost: two code paths to build and maintain (the well-known Lambda downside).
 - Kafka retention + immutable bronze give the batch path replay, and also set up
   the counter-argument below.

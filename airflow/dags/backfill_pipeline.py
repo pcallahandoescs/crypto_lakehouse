@@ -32,7 +32,7 @@ DEFAULT_ARGS = {
     schedule=None,
     start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=["lakehouse", "backfill", "day19"],
+    tags=["lakehouse", "backfill"],
     params={
         "start_date": Param(
             "2026-07-05",

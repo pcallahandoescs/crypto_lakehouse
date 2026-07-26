@@ -4,9 +4,9 @@ Real-time crypto market-data lakehouse: live Coinbase trades streamed through
 Kafka, processed by Spark into a Delta Lake medallion on MinIO, orchestrated by
 Airflow, served via FastAPI + a dashboard, and deployed on Kubernetes.
 
-This document describes the **target** design and the reasoning behind it. Point
-decisions (with alternatives) live in the [decisions log](./docs/adr/). Build
-status is tracked at the bottom.
+This document describes the design and the reasoning behind it — now built
+end-to-end. Point decisions (with alternatives) live in the
+[decisions log](./docs/adr/). Build status is tracked at the bottom.
 
 ---
 
@@ -38,7 +38,7 @@ The six *undercurrents* — security, data management, DataOps, architecture,
 orchestration, software engineering — are addressed throughout (data contracts,
 DQ, idempotency, CI, non-root containers, ADRs, etc.).
 
-## 3. Data flow (target)
+## 3. Data flow
 
 ```mermaid
 flowchart TD
@@ -109,8 +109,8 @@ the gold tables — see ADRs
   ingestion schema (types, invariants, `Decimal` money). See
   [ADR 0008](./docs/adr/0008-data-contract-pydantic.md).
 - **Delivery semantics** — the producer is idempotent (`enable.idempotence` +
-  `acks=all`); bronze ingestion will use streaming checkpoints + Delta atomic
-  commits for **exactly-once** landing; batch jobs will be idempotent via
+  `acks=all`); bronze ingestion uses streaming checkpoints + Delta atomic
+  commits for **exactly-once** landing; batch jobs are idempotent via
   MERGE/partition-overwrite so re-runs never duplicate.
 - **Replayability** — Kafka retention + immutable bronze make backfills and
   reprocessing possible (and underpin the Kappa argument).

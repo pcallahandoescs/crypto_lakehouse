@@ -80,8 +80,9 @@ Confluent Schema Registry) with a binary format like **Avro** or **Protobuf**:
   - **FULL** — both.
   This is the disciplined, org-scale version of what our `extra="forbid"` does
   by hand: it makes schema *evolution* safe and intentional instead of a
-  surprise. (We revisit enforcement-vs-evolution for the Delta tables on
-  Days 11 and 21.)
+  surprise. (Enforcement-vs-evolution for the Delta tables is covered in the
+  [silver transform](./silver_transform.md) docs and proven by a schema-drift
+  test in the suite.)
 
 For this project the Pydantic contract is the right call — we control both ends,
 and it gives us validation, typing, and docs in one file with zero extra

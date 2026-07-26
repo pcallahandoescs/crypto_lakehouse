@@ -16,7 +16,7 @@ from airflow.decorators import dag, task
     start_date=datetime(2026, 1, 1),
     schedule=None,
     catchup=False,
-    tags=["example", "day18"],
+    tags=["example", "smoke-test"],
     doc_md="Smoke test that Airflow is running. Unpause and trigger manually.",
 )
 def example_lakehouse() -> None:
