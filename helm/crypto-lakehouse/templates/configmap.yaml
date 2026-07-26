@@ -1,0 +1,13 @@
+# Shared non-secret wiring (endpoints + topic) injected into the Spark jobs via
+# envFrom. Credentials stay in the Secret; this holds only safe-to-see config.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lakehouse-config
+  labels:
+    app: spark
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+data:
+  MINIO_ENDPOINT: {{ .Values.config.minioEndpoint | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.config.kafkaBootstrapServers | quote }}
+  KAFKA_TOPIC: {{ .Values.config.kafkaTopic | quote }}

@@ -1,0 +1,39 @@
+# Bootstrap Job: create the medallion buckets, then exit. Run as a Helm
+# post-install/post-upgrade hook so it re-runs on every release and is deleted
+# before re-creation (Jobs are otherwise immutable and would block upgrades).
+# `mb --ignore-existing` keeps it idempotent.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-createbuckets
+  labels:
+    app: minio
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 30
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: {{ .Values.minio.clientImage | quote }}
+          env:
+            - name: MC_HOST_local
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "crypto-lakehouse.secretName" . }}
+                  key: MC_HOST_local
+          args:
+            - mb
+            - --ignore-existing
+            {{- range .Values.minio.buckets }}
+            - local/{{ . }}
+            {{- end }}

@@ -1,0 +1,76 @@
+{{- if .Values.serving.enabled }}
+# Serving API — FastAPI over gold via delta-rs. Stateless -> Deployment, exposed
+# on a NodePort so it's reachable from the laptop (kind maps hostPort 8000).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving
+  labels:
+    app: serving
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.serving.replicas }}
+  selector:
+    matchLabels:
+      app: serving
+  template:
+    metadata:
+      labels:
+        app: serving
+    spec:
+      containers:
+        - name: serving
+          image: {{ .Values.serving.image | quote }}
+          imagePullPolicy: {{ .Values.serving.imagePullPolicy }}
+          env:
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.config.minioEndpoint | quote }}
+            {{- include "crypto-lakehouse.minioEnv" . | nindent 12 }}
+            - name: GOLD_BASE_URI
+              value: {{ .Values.serving.goldBaseUri | quote }}
+            - name: PRODUCTS
+              value: {{ .Values.config.products | quote }}
+          ports:
+            - name: http
+              containerPort: 8000
+          {{- if .Values.probes.enabled }}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 20
+            failureThreshold: 6
+          {{- end }}
+          resources:
+            {{- toYaml .Values.serving.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: serving
+  labels:
+    app: serving
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.serving.service.type }}
+  selector:
+    app: serving
+  ports:
+    - name: http
+      port: {{ .Values.serving.service.port }}
+      targetPort: 8000
+      {{- if eq .Values.serving.service.type "NodePort" }}
+      nodePort: {{ .Values.serving.service.nodePort }}
+      {{- end }}
+{{- end }}

@@ -65,5 +65,6 @@ services modeled as **StatefulSets**.
   (silver → gold → DQ) as a one-shot Job. Locally-built images are side-loaded
   with `kind load docker-image`. Verified end-to-end on kind: live trades flow
   through to candles served by the API and rendered in the dashboard.
-- **Day 26** — resource requests/limits, probes, and a Helm chart (deferred to
-  keep this ADR about the Compose→K8s translation).
+- **Packaging + hardening (done)** — resource requests/limits, health probes, and
+  a Helm chart for a one-command parameterized deploy. See
+  [ADR 0017](./0017-helm-packaging-production-hardening.md).

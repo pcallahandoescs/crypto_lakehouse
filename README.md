@@ -52,9 +52,9 @@ flowchart TD
     AIRFLOW["Airflow<br/>(orchestrates batch + backfills)"] -.-> BATCH
 ```
 
-> This diagram is the target design; the Kubernetes deployment layer is still in
-> progress. See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the
-> Lambda rationale, and current build status.
+> See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design, the Lambda
+> rationale, and current build status. The whole stack also runs on Kubernetes
+> (kind), packaged as a [Helm chart](./docs/kubernetes.md#helm-chart-one-command-deploy).
 
 ## Tech stack
 
@@ -82,7 +82,8 @@ spark_jobs/   # Spark Structured Streaming + batch jobs (bronze/silver/gold)
 airflow/      # DAGs orchestrating the batch layer + backfills
 serving/      # FastAPI service serving the gold Delta tables via delta-rs (no Spark)
 dashboard/    # Streamlit + Plotly UI reading the serving API (candlesticks + metrics)
-k8s/          # Kubernetes manifests (kind cluster + StatefulSet backbone)
+k8s/          # Kubernetes manifests (kind cluster + StatefulSet backbone + app tier)
+helm/         # Helm chart: one-command deploy with resource limits + probes
 docs/         # Data schema, Kafka setup, data contract
 docs/adr/     # Architecture Decision Records (the decisions log)
 tests/        # Unit tests (transformations, DQ logic)
@@ -117,7 +118,7 @@ the gate.
 - **Lakehouse & processing** — full Lambda pipeline end-to-end in Compose. **Done.**
 - **Production rigor** — data quality, idempotency, replay, orchestration, observability, tests. **Done.**
 - **Serving & UI** — FastAPI read API over gold (delta-rs, no Spark) + a live Streamlit dashboard. **Done.**
-- **Deployment** — Kubernetes (kind): full stack running (Kafka + MinIO StatefulSets, producer/Spark/serving/dashboard); Helm packaging + hardening next. **In progress.**
+- **Deployment** — Kubernetes (kind): full stack running (Kafka + MinIO StatefulSets, producer/Spark/serving/dashboard), packaged as a Helm chart with resource limits + health probes. **Done.**
 
 ## License
 

@@ -1,0 +1,72 @@
+{{- if .Values.dashboard.enabled }}
+# Dashboard — Streamlit UI over the serving API. Stateless -> Deployment, exposed
+# on a NodePort (kind maps hostPort 8501). Talks to serving by its Service name.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  labels:
+    app: dashboard
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.dashboard.replicas }}
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: {{ .Values.dashboard.image | quote }}
+          imagePullPolicy: {{ .Values.dashboard.imagePullPolicy }}
+          env:
+            - name: API_BASE_URL
+              value: "http://serving:{{ .Values.serving.service.port }}"
+          ports:
+            - name: http
+              containerPort: 8501
+          {{- if .Values.probes.enabled }}
+          # Streamlit exposes /_stcore/health returning "ok" once the server is up.
+          startupProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            periodSeconds: 20
+            failureThreshold: 6
+          {{- end }}
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  labels:
+    app: dashboard
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  selector:
+    app: dashboard
+  ports:
+    - name: http
+      port: {{ .Values.dashboard.service.port }}
+      targetPort: 8501
+      {{- if eq .Values.dashboard.service.type "NodePort" }}
+      nodePort: {{ .Values.dashboard.service.nodePort }}
+      {{- end }}
+{{- end }}

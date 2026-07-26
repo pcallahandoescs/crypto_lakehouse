@@ -10,6 +10,8 @@ repos:
       - id: check-yaml
         # K8s manifests bundle several objects per file with `---` separators.
         args: [--allow-multiple-documents]
+        # Helm templates are Go-templated, not plain YAML — `helm lint` covers them.
+        exclude: ^helm/crypto-lakehouse/templates/
       - id: check-added-large-files
       - id: check-merge-conflict
 

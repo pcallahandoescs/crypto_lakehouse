@@ -3,12 +3,21 @@
 The stack runs on Docker Compose for local development; Kubernetes is the
 **deployment target** — the same containers, orchestrated declaratively with
 self-healing, rolling updates, and horizontal scaling. This is the migration of a
-known-good system from Compose to K8s, done in two steps:
+known-good system from Compose to K8s:
 
 - **The stateful backbone** — Kafka + MinIO as StatefulSets, on a local
   [kind](https://kind.sigs.k8s.io/) cluster.
 - **The app tier** — producer, Spark jobs (streaming Deployments + a batch Job),
   serving API, and dashboard, layered on top.
+
+Two ways to deploy the same objects:
+
+- **Raw manifests** (`k8s/`) — plain, readable YAML applied with `kubectl` /
+  Kustomize. The clearest way to *read* what each object is and why.
+- **[Helm chart](#helm-chart-one-command-deploy)** (`helm/crypto-lakehouse/`) —
+  the packaged, parameterized deploy: one command, tunable images/credentials/
+  resources, with requests/limits and health probes baked in. This is the
+  recommended path for an actual deployment.
 
 ## Why Kubernetes (and why kind locally)
 
@@ -24,7 +33,7 @@ Translating the stack is mostly a matter of picking the right object per concern
 
 | Compose concept | Kubernetes object |
 |---|---|
-| Stateless service (producer, serving, dashboard) | **Deployment** + **Service** *(Day 25)* |
+| Stateless service (producer, serving, dashboard) | **Deployment** + **Service** |
 | Stateful service (Kafka, MinIO) | **StatefulSet** + headless **Service** + **PVC** |
 | Named volume (`minio-data`, `kafka-data`) | **PersistentVolumeClaim** (via `volumeClaimTemplates`) |
 | Inline env | container `env` / **ConfigMap** |
@@ -37,7 +46,7 @@ Translating the stack is mostly a matter of picking the right object per concern
 **StatefulSet vs. Deployment** is the key call: Kafka and MinIO own durable state
 and need a stable identity (`kafka-0`, `minio-0`) plus a per-pod persistent
 volume, so they're StatefulSets. The app tier is stateless and interchangeable —
-those become Deployments in Day 25.
+those are Deployments.
 
 ## What's here
 
@@ -168,15 +177,85 @@ kubectl delete -k k8s/            # remove the workloads
 kind delete cluster --name crypto-lakehouse   # or nuke the whole cluster
 ```
 
-## Deferred (Day 26)
+## Helm chart (one-command deploy)
 
-Production hardening is intentionally kept out of these manifests so the focus
-stays on the Compose→K8s translation:
+The raw manifests above are the readable reference. For an actual deploy, the
+same stack is packaged as a Helm chart that adds the production polish kept out
+of the plain YAML: **resource requests/limits** on every workload,
+**liveness / readiness / startup probes**, and a single `values.yaml` for images,
+credentials, replicas, and resources.
 
-- resource **requests/limits** on every workload,
-- **liveness / readiness / startup probes**,
-- packaging everything as a **Helm chart** for a one-command, parameterized deploy.
+```
+helm/crypto-lakehouse/
+  Chart.yaml
+  values.yaml              # images, credentials, resources, probes — tune here
+  templates/
+    _helpers.tpl           # shared labels + the MinIO-credentials env snippet
+    secret.yaml            # skipped when credentials.existingSecret is set
+    configmap.yaml         # shared non-secret wiring (endpoints, topic)
+    minio.yaml             # StatefulSet + Services + PVC + health probes
+    minio-buckets-job.yaml # post-install hook: create buckets
+    kafka.yaml             # StatefulSet + Services + PVC + health probes
+    kafka-topic-job.yaml   # post-install hook: create topic
+    producer.yaml
+    serving.yaml           # Deployment (+ /health probes) + NodePort
+    dashboard.yaml         # Deployment (+ /_stcore/health probes) + NodePort
+    spark-streaming.yaml   # bronze + speed Deployments (toggleable)
+    spark-batch-job.yaml   # gated batch Job (spark.batch.enabled)
+    NOTES.txt
+```
 
-Also future: running **Airflow** on K8s (today the batch medallion runs as a
-one-shot Job; Airflow orchestration stays in Compose), and native
-**Spark-on-K8s** cluster mode (separate executor pods) instead of `local[*]`.
+Build + load the images the same way as above (`kind load docker-image ...`),
+then install into the `crypto` namespace:
+
+```bash
+helm install crypto-lakehouse helm/crypto-lakehouse \
+  --namespace crypto --create-namespace
+kubectl -n crypto get pods -w
+```
+
+The bucket + topic bootstrap Jobs run as **post-install hooks** (retrying until
+the backbone is ready), so there's no manual apply-ordering. Reach the API at
+`http://localhost:8000/docs` and the dashboard at `http://localhost:8501`.
+
+Populate the gold layer once the bronze stream has data (runs the batch medallion
+as a `post-upgrade` hook):
+
+```bash
+helm upgrade crypto-lakehouse helm/crypto-lakehouse \
+  --reuse-values --set spark.batch.enabled=true
+kubectl -n crypto logs -f job/spark-batch-pipeline
+```
+
+Common overrides (`--set` or a `-f my-values.yaml`):
+
+| Value | Default | Purpose |
+|---|---|---|
+| `credentials.existingSecret` | `""` | Use a Secret from your secret store instead of the chart's dev Secret |
+| `config.products` | `BTC-USD,ETH-USD` | Products to stream and serve |
+| `serving.replicas` / `dashboard.replicas` | `1` | Scale the stateless tier |
+| `*.resources` | see `values.yaml` | Requests/limits per component |
+| `probes.enabled` | `true` | Toggle all health probes |
+| `spark.batch.enabled` | `false` | Render/run the batch medallion Job |
+
+Validate changes before applying:
+
+```bash
+helm lint helm/crypto-lakehouse
+helm template crypto-lakehouse helm/crypto-lakehouse -n crypto | \
+  kubectl apply --dry-run=client -f -
+```
+
+Uninstall (StatefulSet PVCs persist by design — delete them to reclaim disk):
+
+```bash
+helm uninstall crypto-lakehouse -n crypto
+kubectl -n crypto delete pvc --all
+```
+
+## Deferred
+
+Left as deliberate future work: running **Airflow** on K8s (today the batch
+medallion runs as a one-shot Job; Airflow orchestration stays in Compose), and
+native **Spark-on-K8s** cluster mode (separate executor pods) instead of
+`local[*]`.

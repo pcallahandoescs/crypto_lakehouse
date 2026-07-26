@@ -122,9 +122,10 @@ the gold tables — see ADRs
 - **Local:** `docker compose up` wires the whole stack on one Docker network.
   Kafka advertises a `HOST` listener (`localhost:9092`) for laptop tools and a
   `DOCKER` listener (`kafka:29092`) for in-network services.
-- **Kubernetes (planned):** stateless apps (producer, API, dashboard) become
-  Deployments; stateful backbone (Kafka, MinIO) become StatefulSets with
-  PersistentVolumeClaims; config via ConfigMaps/Secrets; packaged with Helm.
+- **Kubernetes:** stateless apps (producer, API, dashboard) run as Deployments;
+  the stateful backbone (Kafka, MinIO) as StatefulSets with PersistentVolumeClaims;
+  config via ConfigMaps/Secrets. The whole stack is packaged as a Helm chart with
+  resource requests/limits and liveness/readiness/startup probes.
 
 ## 8. Build status
 
@@ -136,7 +137,7 @@ the gold tables — see ADRs
 | Serving: FastAPI read API over gold (delta-rs, no Spark) | **complete** |
 | Dashboard: live Streamlit + Plotly UI over the serving API | **complete** |
 | Kubernetes deployment (kind): full stack running (backbone + app tier) | **complete** |
-| Kubernetes production hardening + Helm chart | pending |
+| Kubernetes production hardening (resources, probes) + Helm chart | **complete** |
 
 **Implemented to date:** Spark + Delta + MinIO; bronze streaming ingestion
 (exactly-once); silver parse/type/dedup; batch gold OHLC/VWAP candles;

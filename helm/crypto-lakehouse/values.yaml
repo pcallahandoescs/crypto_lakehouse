@@ -1,0 +1,141 @@
+# Default values for the crypto-lakehouse chart.
+#
+# Everything the stack needs is tunable here: image tags, credentials, replica
+# counts, resource requests/limits, and health probes. The in-cluster Service
+# names (kafka, minio, serving, dashboard) are intentionally fixed so app config
+# (KAFKA_BOOTSTRAP_SERVERS=kafka:9092, MINIO_ENDPOINT=http://minio:9000) carries
+# over unchanged from Compose and the raw manifests.
+
+# -- Wiring shared by the Spark jobs and app services (safe, non-secret). --
+config:
+  kafkaBootstrapServers: "kafka:9092"
+  kafkaTopic: "crypto.trades.raw"
+  minioEndpoint: "http://minio:9000"
+  # Comma-separated Coinbase product ids to stream and serve.
+  products: "BTC-USD,ETH-USD"
+
+# -- MinIO credentials. LOCAL-DEV defaults only; in a real deployment these come
+#    from a secret manager (existingSecret) and are never committed. --
+credentials:
+  # Set to the name of a pre-existing Secret to skip rendering the chart's Secret.
+  # That Secret must provide keys: MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, MC_HOST_local.
+  existingSecret: ""
+  minioRootUser: minioadmin
+  minioRootPassword: minioadmin
+
+# ---------------------------------------------------------------------------
+# Stateful backbone
+# ---------------------------------------------------------------------------
+minio:
+  image: cgr.dev/chainguard/minio:latest
+  clientImage: cgr.dev/chainguard/minio-client:latest
+  storage: 5Gi
+  # Medallion buckets created by the post-install bootstrap Job.
+  buckets:
+    - bronze
+    - silver
+    - gold
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+kafka:
+  image: apache/kafka:4.0.0
+  storage: 5Gi
+  numPartitions: 6
+  replicationFactor: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+# ---------------------------------------------------------------------------
+# App tier
+# ---------------------------------------------------------------------------
+producer:
+  enabled: true
+  image: crypto-lakehouse-producer:0.1.0
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+serving:
+  enabled: true
+  image: crypto-lakehouse-serving:0.1.0
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  goldBaseUri: "s3://gold"
+  service:
+    type: NodePort
+    port: 8000
+    nodePort: 30800
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+dashboard:
+  enabled: true
+  image: crypto-lakehouse-dashboard:0.1.0
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    type: NodePort
+    port: 8501
+    nodePort: 30850
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+spark:
+  image: crypto-lakehouse-spark:3.5.3
+  imagePullPolicy: IfNotPresent
+  # Passed to spark-submit --driver-memory for every job. Keep the container
+  # memory limit above this to leave room for JVM non-heap + Python overhead.
+  driverMemory: 2g
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: "3"
+      memory: 3Gi
+  streaming:
+    # Bronze: Kafka -> bronze Delta (raw, exactly-once).
+    bronze:
+      enabled: true
+    # Speed layer: Kafka -> gold/realtime_metrics (sliding-window metrics).
+    speed:
+      enabled: true
+  # Batch medallion run (silver -> gold -> DQ). Off by default: it reads bronze,
+  # so run it only after the stream has landed data, via:
+  #   helm upgrade ... --set spark.batch.enabled=true
+  # or apply the raw k8s/apps/spark-batch-job.yaml on demand.
+  batch:
+    enabled: false
+    backoffLimit: 2
+
+# -- Liveness/readiness/startup probes. Toggle per component; tuned for a
+#    single-node kind cluster where JVM/Spark start-up is slow. --
+probes:
+  enabled: true

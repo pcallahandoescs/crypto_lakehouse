@@ -1,0 +1,24 @@
+apiVersion: v2
+name: crypto-lakehouse
+description: >-
+  Real-time crypto market data lakehouse: Coinbase WebSocket producer -> Kafka
+  -> Spark Structured Streaming -> Delta Lake medallion on MinIO, served via
+  FastAPI and visualized with Streamlit. One chart deploys the full stack
+  (stateful backbone + app tier) with resource limits and health probes.
+type: application
+
+# Chart version is bumped per packaging change; appVersion tracks the app images.
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - lakehouse
+  - kafka
+  - spark
+  - delta-lake
+  - minio
+  - fastapi
+  - streamlit
+home: https://github.com/pcallahandoescs/crypto_lakehouse
+maintainers:
+  - name: crypto-lakehouse

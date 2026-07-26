@@ -1,0 +1,11 @@
+# Patterns to exclude from the packaged chart (.tgz).
+.DS_Store
+.git/
+.gitignore
+*.tmproj
+*.bak
+*.swp
+*.orig
+*~
+.idea/
+.vscode/

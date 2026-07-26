@@ -1,0 +1,25 @@
+crypto-lakehouse {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}"
+in namespace "{{ .Release.Namespace }}".
+
+Watch it come up:
+  kubectl -n {{ .Release.Namespace }} get pods -w
+
+The stateful backbone (Kafka, MinIO) starts first; the bucket + topic bootstrap
+Jobs run as post-install hooks and retry until the backbone is ready.
+
+Reach the UIs (kind maps these host ports):
+{{- if .Values.serving.enabled }}
+  Serving API : http://localhost:{{ .Values.serving.service.nodePort | default .Values.serving.service.port }}/docs   (in-cluster: http://serving:{{ .Values.serving.service.port }})
+{{- end }}
+{{- if .Values.dashboard.enabled }}
+  Dashboard   : http://localhost:{{ .Values.dashboard.service.nodePort | default .Values.dashboard.service.port }}
+{{- end }}
+
+Populate the gold layer once bronze has data (batch medallion run):
+  helm upgrade {{ .Release.Name }} <chart> --reuse-values --set spark.batch.enabled=true
+  kubectl -n {{ .Release.Namespace }} logs -f job/spark-batch-pipeline
+
+Tear everything down:
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+  # PVCs from StatefulSets persist by design; delete them to reclaim disk:
+  kubectl -n {{ .Release.Namespace }} delete pvc -l app=minio -l app=kafka

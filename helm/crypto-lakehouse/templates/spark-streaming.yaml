@@ -1,0 +1,83 @@
+# Spark Structured Streaming jobs — long-running, so Deployments (a dead driver is
+# replaced and resumes from its Delta checkpoint on MinIO). Run in local[*] mode
+# in one pod (driver = executors), the same way Compose did. No liveness probe: a
+# false positive would kill a healthy driver; the job self-manages via checkpoints.
+{{- if .Values.spark.streaming.bronze.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bronze-ingest
+  labels:
+    app: spark
+    job: bronze-ingest
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      job: bronze-ingest
+  template:
+    metadata:
+      labels:
+        app: spark
+        job: bronze-ingest
+    spec:
+      containers:
+        - name: bronze-ingest
+          image: {{ .Values.spark.image | quote }}
+          imagePullPolicy: {{ .Values.spark.imagePullPolicy }}
+          command:
+            - /opt/spark/bin/spark-submit
+            - --master
+            - local[*]
+            - --driver-memory
+            - {{ .Values.spark.driverMemory | quote }}
+            - bronze_ingest.py
+          envFrom:
+            - configMapRef:
+                name: lakehouse-config
+          env:
+            {{- include "crypto-lakehouse.minioEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.spark.resources | nindent 12 }}
+{{- end }}
+{{- if .Values.spark.streaming.speed.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speed-metrics
+  labels:
+    app: spark
+    job: speed-metrics
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      job: speed-metrics
+  template:
+    metadata:
+      labels:
+        app: spark
+        job: speed-metrics
+    spec:
+      containers:
+        - name: speed-metrics
+          image: {{ .Values.spark.image | quote }}
+          imagePullPolicy: {{ .Values.spark.imagePullPolicy }}
+          command:
+            - /opt/spark/bin/spark-submit
+            - --master
+            - local[*]
+            - --driver-memory
+            - {{ .Values.spark.driverMemory | quote }}
+            - speed_metrics.py
+          envFrom:
+            - configMapRef:
+                name: lakehouse-config
+          env:
+            {{- include "crypto-lakehouse.minioEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.spark.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,38 @@
+# Bootstrap Job: create the raw trades topic (auto-create is disabled). Runs as a
+# Helm post-install/post-upgrade hook and retries until the broker is reachable;
+# --if-not-exists keeps it idempotent.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topic
+  labels:
+    app: kafka
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 30
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topic
+          image: {{ .Values.kafka.image | quote }}
+          command:
+            - /opt/kafka/bin/kafka-topics.sh
+            - --bootstrap-server
+            - {{ .Values.config.kafkaBootstrapServers | quote }}
+            - --create
+            - --if-not-exists
+            - --topic
+            - {{ .Values.config.kafkaTopic | quote }}
+            - --partitions
+            - {{ .Values.kafka.numPartitions | quote }}
+            - --replication-factor
+            - {{ .Values.kafka.replicationFactor | quote }}

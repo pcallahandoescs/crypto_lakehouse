@@ -1,0 +1,48 @@
+{{- if .Values.spark.batch.enabled }}
+# Batch medallion run: silver -> gold -> data-quality, as one sequential Job (the
+# K8s equivalent of the Airflow batch DAG). Off by default because it reads the
+# bronze table — enable only once the stream has landed data:
+#   helm upgrade <release> ./helm/crypto-lakehouse --reuse-values --set spark.batch.enabled=true
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spark-batch-pipeline
+  labels:
+    app: spark
+    job: batch-pipeline
+    {{- include "crypto-lakehouse.labels" . | nindent 4 }}
+  annotations:
+    # Re-run on each upgrade; delete the prior (immutable) Job first.
+    "helm.sh/hook": post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: {{ .Values.spark.batch.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        app: spark
+        job: batch-pipeline
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: batch
+          image: {{ .Values.spark.image | quote }}
+          imagePullPolicy: {{ .Values.spark.imagePullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              SUBMIT="/opt/spark/bin/spark-submit --master local[*] --driver-memory {{ .Values.spark.driverMemory }}"
+              echo ">>> silver_batch"; $SUBMIT silver_batch.py
+              echo ">>> gold_aggregate"; $SUBMIT gold_aggregate.py
+              echo ">>> dq_validate"; $SUBMIT dq_validate.py
+              echo ">>> batch pipeline complete"
+          envFrom:
+            - configMapRef:
+                name: lakehouse-config
+          env:
+            {{- include "crypto-lakehouse.minioEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.spark.resources | nindent 12 }}
+{{- end }}
